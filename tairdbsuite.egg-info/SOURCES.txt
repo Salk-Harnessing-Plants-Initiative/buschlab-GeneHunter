@@ -1,0 +1,17 @@
+LICENSE
+MANIFEST.in
+README.rst
+setup.py
+tairdbsuite/__init__.py
+tairdbsuite/__main__.py
+tairdbsuite/tairdbsuite.py
+tairdbsuite.egg-info/PKG-INFO
+tairdbsuite.egg-info/SOURCES.txt
+tairdbsuite.egg-info/dependency_links.txt
+tairdbsuite.egg-info/entry_points.txt
+tairdbsuite.egg-info/requires.txt
+tairdbsuite.egg-info/top_level.txt
+tairdbsuite/core/TairDBCreator.py
+tairdbsuite/core/TairDBExtractor.py
+tairdbsuite/core/TairDBModels.py
+tairdbsuite/core/__init__.py
