@@ -99,6 +99,19 @@ class TairdbSuite(object):
     def extract_hunter(args):
         dbextract = TairDBExtractor(args.db)
 
+        if args.output is None:
+            ostream = sys.stdout
+            isfile = False
+        else:
+            ostream = open(args.output, 'w')
+            isfile = True
+
+        ostream.write("Original_file\tChromosome\tSNP_pos\tGWAS_p-value\tFDR_{}_rejected\t".format(args.fdr))
+        ostream.write("FDR_{}_adjusted_p-value\tBonferroni_{}_threshold\t".format(args.fdr, args.fdr))
+        ostream.write("BH_{}_threshold\tBHY_{}_threshold\tGene_start\tGene_end\t".format(args.fdr, args.fdr, args.fdr))
+        ostream.write("Gene_orientation\tRelative_Distance\tSNP_relative_position\ttarget_AGI\ttarget_element_type\t")
+        ostream.write("short_symbol\tlong_symbol\tshort_description\tlong_description\n")
+
         for gwasfilename in glob.glob(os.path.join(args.dir, args.name)):
             lvl = 1
             with open(gwasfilename, 'r') as gwasfile:
@@ -155,20 +168,9 @@ class TairdbSuite(object):
             # print(len(sm.multipletests(gwaspvalues, alpha=0.05, method='fdr_by', is_sorted=False, returnsorted=False)))
             fdr_rejected, fdr_adjusted, dummy1, dummy2 = sm.multipletests(gwaspvalues, alpha=args.fdr, method='fdr_bh',
                                                                           is_sorted=False, returnsorted=False)
-            sys.stdout.write("checking pvalues.\n")
-            if args.output is None:
-                ostream = sys.stdout
-                isfile = False
-            else:
-                ostream = open(args.output, 'w')
-                isfile = True
+            sys.stdout.write("checking pvalues: \n")
 
-            ostream.write("Original_file\tChromosome\tSNP_pos\tGWAS_p-value\tFDR_{}_rejected\t".format(args.fdr))
-            ostream.write("FDR_{}_adjusted_p-value\tBonferroni_{}_threshold\t".format(args.fdr, args.fdr))
-            ostream.write("BH_{}_threshold\tBHY_{}_threshold\tGene_start\tGene_end\t".format(args.fdr, args.fdr, args.fdr))
-            ostream.write("Gene_orientation\tDistance_Gene\tSNP_relative_position\ttarget_AGI\ttarget_element_type\t")
-            ostream.write("short_symbol\tlong_symbol\tshort_description\tlong_description\n")
-
+            passed_cnt = 0
             for idx in range(len(gwasvalues)):
                 gw_chr = gwasvalues[idx][0]
                 gw_pos = int(gwasvalues[idx][1])
@@ -176,9 +178,11 @@ class TairdbSuite(object):
                 gw_mac = int(gwasvalues[idx][4])
 
                 if gw_pval <= used_threshold and gw_mac >= args.minor_allele_count:
+                    passed_cnt += 1
                     dbextract.flush()
                     dbextract.extract_loc_uddist(gw_chr, gw_pos, args.udistance, args.ddistance)
                     genes = dbextract.get_genes()
+                    sys.stdout.write("peak: chr{}, pos {} -> {} genes in range\n".format(gw_chr, gw_pos, len(genes)))
 
                     for gene in genes:
                         ostream.write("%s\t" % os.path.basename(gwasfilename))
@@ -193,9 +197,9 @@ class TairdbSuite(object):
                         ostream.write("%d\t" % gene.loc_end)
                         ostream.write("%s\t" % gene.orientation)
                         if gene.orientation == '+':
-                            ostream.write("%d\t" % (gene.loc_start - gw_pos))
+                            ostream.write("%d\t" % abs(gene.loc_start - gw_pos))
                         else:
-                            ostream.write("%d\t" % (gene.loc_end - gw_pos))
+                            ostream.write("%d\t" % abs(gene.loc_end - gw_pos))
 
                         if gene.loc_start <= gw_pos <= gene.loc_end:
                             relpos = "in gene"
@@ -231,9 +235,9 @@ class TairdbSuite(object):
                                 ostream.write("%d\t" % child.loc_end)
                                 ostream.write("%s\t" % gene.orientation)
                                 if gene.orientation == '+':
-                                    ostream.write("%d\t" % (child.loc_start - gw_pos))
+                                    ostream.write("%d\t" % abs(child.loc_start - gw_pos))
                                 else:
-                                    ostream.write("%d\t" % (child.loc_end - gw_pos))
+                                    ostream.write("%d\t" % abs(child.loc_end - gw_pos))
 
                                 if child.loc_start <= gw_pos <= child.loc_end:
                                     relpos = "in gene"
@@ -254,7 +258,8 @@ class TairdbSuite(object):
                                 ostream.write("%s\t" % gene.longsym)
                                 ostream.write("%s\t" % child.description.shortdesc)
                                 ostream.write("%s\n" % child.description.longdesc)
-
+                                ostream.flush()
+            sys.stdout.write("{} peaks passed.\n".format(passed_cnt))
         if isfile:
             ostream.close()
 
