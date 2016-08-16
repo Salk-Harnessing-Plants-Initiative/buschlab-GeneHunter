@@ -2,7 +2,6 @@
 
 """tairdbsuite.tairdbsuite: module doing the argument parsing and dispatching the commands."""
 
-
 import sys
 import os
 import re
@@ -10,6 +9,7 @@ import glob
 import argparse
 import statsmodels.sandbox.stats.multicomp as sm
 # import numpy as np
+import tairdbsuite.core.mtcorr as mt
 from tairdbsuite.core.TairDBCreator import TairDBCreator
 from tairdbsuite.core.TairDBExtractor import TairDBExtractor
 
@@ -98,17 +98,6 @@ class TairdbSuite(object):
     @staticmethod
     def extract_hunter(args):
         dbextract = TairDBExtractor(args.db)
-        if args.output is None:
-            ostream = sys.stdout
-            isfile = False
-        else:
-            ostream = open(args.output, 'w')
-            isfile = True
-
-        ostream.write("Original_file\tChromosome\tSNP_pos\tGWAS p-value\tFDR_rejected\t")
-        ostream.write("FDR_adjusted_p-value\tGene_start\tGene_end\tGene_orientation\t")
-        ostream.write("Distance Gene\tSNP relative position\ttarget AGI\ttarget element type\t")
-        ostream.write("short symbol\tlong symbol\tshort description\tlong description\n")
 
         for gwasfilename in glob.glob(os.path.join(args.dir, args.name)):
             lvl = 1
@@ -125,33 +114,68 @@ class TairdbSuite(object):
                             gwaspvalues.append(float(cols[2]))
                             gwasvalues.append(cols)
                         except ValueError:
+                            # print("could not read p-value in file: {} (line {})", gwasfilename, linenr)
                             continue
-#                     try:
-#                         cchr=int(cols[0])
-#                         cpos=int(cols[1])
-#                         csco=float(cols[2])
-#                         cmaf=float(cols[3])
-#                         cmac=int(cols[4])
-#                         cvar=float(cols[5])
-#                         gwasvalues.append([cchr,cpos,csco,cmaf,cmac,cvar])
-#                     except ValueError:
-#                         #sys.stderr.write("error in line %d: '%s'\n" % (linenr,line.strip()))
-#                         continue
+                        #                     try:
+                        #                         cchr=int(cols[0])
+                        #                         cpos=int(cols[1])
+                        #                         csco=float(cols[2])
+                        #                         cmaf=float(cols[3])
+                        #                         cmac=int(cols[4])
+                        #                         cvar=float(cols[5])
+                        #                         gwasvalues.append([cchr,cpos,csco,cmaf,cmac,cvar])
+                        #                     except ValueError:
+                        #                         #sys.stderr.write("error in line %d: '%s'\n" % (linenr,line.strip()))
+                        #                         continue
 
-#            gwasvalues=np.array(gwasvalues)
-#             print(gwasfilename)
-#             print(gwasvalues[:,2])
+                        #            gwasvalues=np.array(gwasvalues)
+                        #             print(gwasfilename)
+                        #             print(gwasvalues[:,2])
 
-            fdr_rejected, fdr_adjusted = sm.fdrcorrection0(gwaspvalues, alpha=0.05, method='indep', is_sorted=False)
+            bonf_thres = args.fdr/float(len(gwaspvalues))
+            bh_thres = mt.get_bh_thres(gwaspvalues, args.fdr)['thes_pval']
+            bhy_thres = mt.get_bhy_thres(gwaspvalues, args.fdr)['thes_pval']
+            try:
+                used_threshold = float(args.pvalue_threshold)
+                sys.stdout.write("using custom threshold: {:e}\n".format(used_threshold))
+            except ValueError:
+                if args.pvalue_threshold.lower() == 'bonf':
+                    used_threshold = bonf_thres
+                    sys.stdout.write("using bonferroni threshold (fdr {}): {:e}\n".format(args.fdr,used_threshold))
+                elif args.pvalue_threshold.lower() == 'bh':
+                    used_threshold = bh_thres
+                    sys.stdout.write("using benjamini-hochberg threshold (fdr {}): {:e}\n".format(args.fdr, used_threshold))
+                elif args.pvalue_threshold.lower() == 'bhy':
+                    used_threshold = bhy_thres
+                    sys.stdout.write("using benjamini-hochberg-yekutieli threshold (fdr {}): {:e}\n".format(args.fdr, used_threshold))
+                else:
+                    raise Exception("unkown p-value threshold method.")
 
+            # fdr_rejected, fdr_adjusted = sm.fdrcorrection0(gwaspvalues, alpha=0.05, method='negcorr', is_sorted=False)
+            # print(len(sm.multipletests(gwaspvalues, alpha=0.05, method='fdr_by', is_sorted=False, returnsorted=False)))
+            fdr_rejected, fdr_adjusted, dummy1, dummy2 = sm.multipletests(gwaspvalues, alpha=args.fdr, method='fdr_bh',
+                                                                          is_sorted=False, returnsorted=False)
             sys.stdout.write("checking pvalues.\n")
+            if args.output is None:
+                ostream = sys.stdout
+                isfile = False
+            else:
+                ostream = open(args.output, 'w')
+                isfile = True
+
+            ostream.write("Original_file\tChromosome\tSNP_pos\tGWAS_p-value\tFDR_{}_rejected\t".format(args.fdr))
+            ostream.write("FDR_{}_adjusted_p-value\tBonferroni_{}_threshold\t".format(args.fdr, args.fdr))
+            ostream.write("BH_{}_threshold\tBHY_{}_threshold\tGene_start\tGene_end\t".format(args.fdr, args.fdr, args.fdr))
+            ostream.write("Gene_orientation\tDistance_Gene\tSNP_relative_position\ttarget_AGI\ttarget_element_type\t")
+            ostream.write("short_symbol\tlong_symbol\tshort_description\tlong_description\n")
+
             for idx in range(len(gwasvalues)):
                 gw_chr = gwasvalues[idx][0]
                 gw_pos = int(gwasvalues[idx][1])
                 gw_pval = float(gwasvalues[idx][2])
                 gw_mac = int(gwasvalues[idx][4])
 
-                if gw_pval <= args.pvalue_threshold and gw_mac >= args.minor_allele_count:
+                if gw_pval <= used_threshold and gw_mac >= args.minor_allele_count:
                     dbextract.flush()
                     dbextract.extract_loc_uddist(gw_chr, gw_pos, args.udistance, args.ddistance)
                     genes = dbextract.get_genes()
@@ -163,6 +187,8 @@ class TairdbSuite(object):
                         ostream.write("%s\t" % gw_pval)
                         ostream.write("%f\t" % fdr_rejected[idx])
                         ostream.write("%f\t" % fdr_adjusted[idx])
+                        ostream.write("%e\t" % bh_thres)
+                        ostream.write("%e\t" % bhy_thres)
                         ostream.write("%d\t" % gene.loc_start)
                         ostream.write("%d\t" % gene.loc_end)
                         ostream.write("%s\t" % gene.orientation)
@@ -199,6 +225,8 @@ class TairdbSuite(object):
                                 ostream.write("%s\t" % gw_pval)
                                 ostream.write("%f\t" % fdr_rejected[idx])
                                 ostream.write("%f\t" % fdr_adjusted[idx])
+                                ostream.write("%e\t" % bh_thres)
+                                ostream.write("%e\t" % bhy_thres)
                                 ostream.write("%d\t" % child.loc_start)
                                 ostream.write("%d\t" % child.loc_end)
                                 ostream.write("%s\t" % gene.orientation)
@@ -276,11 +304,14 @@ class TairdbSuite(object):
                                   help='maximal upstream distance from TSS (default=4000)')
         hunterparser.add_argument('-d', '--ddistance', type=int, default=4000,
                                   help='maximal downstream distance from TSS (default=4000)')
-        hunterparser.add_argument('-P', '--pvalue_threshold', type=float, default=1.0e-6,
-                                  help='SNP p-value threshold (default=1.0e-6)')
+        hunterparser.add_argument('-P', '--pvalue_threshold', default='1.0e-6',
+                                  help='SNP p-value threshold (default=1.0e-6). If the given argument is \"bonf\", \
+                                  \"bh\" or \"bhy\", only values below the calculated threshold are included.')
         hunterparser.add_argument('-M', '--minor_allele_count', type=int, default=10,
                                   help='minor allele count threshold (default=10)')
         hunterparser.add_argument('-o', '--output', help='path to output file. Will print to stdout if omitted.')
+        hunterparser.add_argument('-f', '--fdr', type=float, default=0.05,
+                                  help="alpha for fdr threshold calculation")
         hunterparser.set_defaults(func=self.extract_hunter)
 
         args = mainparser.parse_args()

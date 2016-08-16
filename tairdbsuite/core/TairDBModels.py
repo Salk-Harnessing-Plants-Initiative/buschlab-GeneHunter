@@ -23,7 +23,7 @@ class TairGene(Base):
     shortsym = Column(String)
     longsym = Column(String)
     attributes = Column(String)
-    children = relationship("Tair_Level1", back_populates="parent")
+    children = relationship("TairLevel1", back_populates="parent")
 
 
 class TairLevel1(Base):
@@ -36,9 +36,9 @@ class TairLevel1(Base):
     loc_end = Column(Integer)
     attributes = Column(String)
     parent_id = Column(Integer, ForeignKey('tair10genes.id'))
-    parent = relationship("Tair_Gene", back_populates="children")
-    children = relationship("Tair_Level2")
-    description = relationship("Tair_Desc", uselist=False, back_populates="level1")
+    parent = relationship("TairGene", back_populates="children")
+    children = relationship("TairLevel2")
+    description = relationship("TairDesc", uselist=False, back_populates="level1")
 
 
 class TairLevel2(Base):
@@ -50,7 +50,7 @@ class TairLevel2(Base):
     loc_end = Column(Integer)
     attributes = Column(String)
     level1_id = Column(Integer, ForeignKey('tair10level1.id'))
-    level1 = relationship("Tair_Level1", back_populates="children")
+    level1 = relationship("TairLevel1", back_populates="children")
 
 
 class TairDesc(Base):
@@ -63,4 +63,4 @@ class TairDesc(Base):
     type = Column(String)
     model = Column(Integer)
     level1_id = Column(Integer, ForeignKey('tair10level1.id'))
-    level1 = relationship("Tair_Level1", back_populates="description")
+    level1 = relationship("TairLevel1", back_populates="description")
