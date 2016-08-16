@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 
-from .TairDBModels import Base, TairGene, TairLevel1, TairLevel2, TairDesc
+from .TairDBModels2 import Base, Gene, XRNA, Feature, Description
 
 
 class TairDBCreator(object):
@@ -24,27 +24,57 @@ class TairDBCreator(object):
         self.session = session()
 
     def create_gff_entries(self, gff_filepath):
-        file_lines = sum(1 for _ in open(gff_filepath))
+        # file_lines = sum(1 for _ in open(gff_filepath))
         with open(gff_filepath, 'r') as gff_file:
             linenr = 0
-            t0 = time.clock()
-            tprev = t0
+            # t0 = time.clock()
+            # tprev = t0
             sys.stdout.write("Reading gff-file '%s'\n" % gff_filepath)
             for line in gff_file:
                 line = line.strip()
 
                 linenr += 1
-                tcur = time.clock()
-                if tcur - tprev >= 1.0:
-                    teta = (tcur - t0) / linenr * (file_lines - linenr)
-                    percent_cur = float(linenr) / file_lines * 100.0
-                    sys.stdout.write(" %3.2f%% (ETA: %.3fs)\r" % (percent_cur, teta))
-                    sys.stdout.flush()
-                    tprev = tcur
+                # tcur = time.clock()
+                # if tcur - tprev >= 1.0:
+                #     teta = (tcur - t0) / linenr * (file_lines - linenr)
+                #     percent_cur = float(linenr) / file_lines * 100.0
+                #     sys.stdout.write(" %3.2f%% (ETA: %.3fs)\r" % (percent_cur, teta))
+                #     sys.stdout.flush()
+                #     tprev = tcur
 
                 cols = line.split('\t')
-                if cols[2] == 'chromosome':
-                    continue
+                attrs = self._extract_attributes(cols[8])
+                # if cols[2] == 'chromosome':
+                #     continue # ignore 'chromosome' entries found in TAIR10
+                if cols[2].lower() == 'gene':
+                    gene_start = int(cols[3])
+                    gene_end = int(cols[4])
+                    gene = Gene(seqname=cols[0], source=cols[1], feature=cols[2], start=gene_start,
+                                end=gene_end, score=float(cols[5]), strand=cols[6], frame=cols[7],
+                                attribute=cols[8], id=attrs['id'])
+                    self.session.add(gene)
+
+                    for line in gff_file:
+                        line = line.strip()
+
+                        cols = line.split('\t')
+                        feature_start = int(cols[3])
+                        feature_end = int(cols[4])
+                        attrs = self._extract_attributes(cols[8])
+                        if 'chromosome' in cols[2].lower():
+                            continue
+                        if 'rna' in cols[2].lower():
+                            xrna = XRNA(seqname=cols[0], source=cols[1], feature=cols[2], start=feature_start,
+                                        end=feature_end, score=float(cols[5]), strand=cols[6], frame=cols[7],
+                                        attribute=cols[8], id=attrs['id'])
+                            gene.xrnas.append(xrna)
+                            gene.strand = cols[6]
+                        else:
+                            feature = Feature(seqname=cols[0], source=cols[1], feature=cols[2], start=int(cols[3]),
+                                              end=int(cols[4]), score=float(cols[5]), strand=cols[6], frame=cols[7],
+                                              attribute=cols[8], id=attrs['id'])
+                            xrna.features.append(feature)
+
 
                 (eagi, lvl) = self._extract_agi(cols[8])
 
@@ -258,3 +288,16 @@ class TairDBCreator(object):
                         lvl = 0
                 break
         return agi, lvl
+
+    @staticmethod
+    def _extract_attributes(istr):
+        cols = re.split(';|,', istr)
+
+        attrs = {}
+        for col in cols:
+            if 'parent' in col.lower():
+                attrs['parent'] = col.split('=')[1].strip()
+            elif 'id' in col.lower():
+                attrs['id'] = col.split('=')[1].strip()
+
+        return attrs
