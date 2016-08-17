@@ -13,7 +13,7 @@ import tairdbsuite.core.mtcorr as mt
 from tairdbsuite.core.TairDBCreator import TairDBCreator
 from tairdbsuite.core.TairDBExtractor import TairDBExtractor
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 def main():
