@@ -10,8 +10,8 @@ import argparse
 import statsmodels.sandbox.stats.multicomp as sm
 # import numpy as np
 import tairdbsuite.core.mtcorr as mt
-from tairdbsuite.core.TairDBCreator import TairDBCreator
-from tairdbsuite.core.TairDBExtractor import TairDBExtractor
+from tairdbsuite.core.GeneAnnotationDbCreator import GeneAnnotationDbCreator
+from tairdbsuite.core.GeneAnnotationDbExtractor import GeneAnnotationDbExtractor
 
 __version__ = "0.1.1"
 
@@ -37,7 +37,7 @@ class TairdbSuite(object):
             raise Exception("cannot open aliases file '%s'! Terminating!\n" % args.aliases)
         if args.sorf is not None and not os.path.exists(args.sorf):
             raise Exception("cannot open sORF file '%s'! Terminating!\n" % args.sorf)
-        creator = TairDBCreator(args.output)
+        creator = GeneAnnotationDbCreator(args.output)
         creator.create_gff_entries(args.gff)
         if args.desc is not None:
             creator.create_desc_entries(args.desc)
@@ -68,7 +68,7 @@ class TairdbSuite(object):
         elif args.i:
             intervals.append((args.chr, args.loc1, args.loc2))
 
-        extractor = TairDBExtractor(args.db)
+        extractor = GeneAnnotationDbExtractor(args.db)
         for interval in intervals:
             extractor.extract_by_loc(interval[1], interval[2], interval[0])
         extractor.write_results(args.output, 1)
@@ -89,7 +89,7 @@ class TairdbSuite(object):
         else:
             agis.append(args.agi)
 
-        extractor = TairDBExtractor(args.db)
+        extractor = GeneAnnotationDbExtractor(args.db)
         for agi in agis:
             extractor.extract_by_agi(agi)
         extractor.write_results(args.output, 1)
@@ -97,7 +97,7 @@ class TairdbSuite(object):
 
     @staticmethod
     def extract_hunter(args):
-        dbextract = TairDBExtractor(args.db)
+        dbextract = GeneAnnotationDbExtractor(args.db)
 
         if args.output is None:
             ostream = sys.stdout
@@ -283,7 +283,7 @@ class TairdbSuite(object):
         extract_by_loc.add_argument('--loc1', type=int,
                                     help='locus 1 (has different meanings depending on other options)')
         extract_by_loc.add_argument('--loc2', type=int, help='locus 2 (different meanings depending on other options)')
-        extract_by_loc.add_argument('--chr', type=int, help='chromosome')
+        extract_by_loc.add_argument('--chr', help='chromosome')
         extract_by_loc.add_argument('-c', action="store_true", help='centered around loc1, interval = +/-loc2')
         extract_by_loc.add_argument('-i', action="store_true", help='from locus interval. loc1=start, loc2=end')
         extract_by_loc.add_argument('--file',
