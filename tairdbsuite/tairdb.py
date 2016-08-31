@@ -71,7 +71,7 @@ class TairdbSuite(object):
         extractor = GeneAnnotationDbExtractor(args.db)
         for interval in intervals:
             extractor.extract_by_loc(interval[1], interval[2], interval[0])
-        extractor.write_results(args.output, 1)
+        extractor.write_results(args.output, args.depth)
 
         return
 
@@ -98,6 +98,14 @@ class TairdbSuite(object):
     @staticmethod
     def extract_hunter(args):
         dbextract = GeneAnnotationDbExtractor(args.db)
+        dbid = dbextract.get_database_id()
+
+        if dbid == 'Lj'.encode():
+            sys.stdout.write("using the Lotus annotation database.\n")
+        elif dbid == 'AT'.encode():
+            sys.stdout.write("using the Arabidopsis Tair database.\n")
+        else:
+            sys.stdout.write("using unkown gene database (ID = {}). ".format(dbid))
 
         if args.output is None:
             ostream = sys.stdout
@@ -110,7 +118,8 @@ class TairdbSuite(object):
         ostream.write("FDR_{}_adjusted_p-value\tBonferroni_{}_threshold\t".format(args.fdr, args.fdr))
         ostream.write("BH_{}_threshold\tBHY_{}_threshold\tGene_start\tGene_end\t".format(args.fdr, args.fdr, args.fdr))
         ostream.write("Gene_orientation\tRelative_Distance\tSNP_relative_position\ttarget_AGI\ttarget_element_type\t")
-        ostream.write("short_symbol\tlong_symbol\tshort_description\tlong_description\n")
+        ostream.write("target_sequence_type\ttarget_annotation\ttarget_attributes\n")
+        # ostream.write("short_symbol\tlong_symbol\tshort_description\tlong_description\n")
 
         for gwasfilename in glob.glob(os.path.join(args.dir, args.name)):
             lvl = 1
@@ -129,23 +138,23 @@ class TairdbSuite(object):
                         except ValueError:
                             # print("could not read p-value in file: {} (line {})", gwasfilename, linenr)
                             continue
-                        #                     try:
-                        #                         cchr=int(cols[0])
-                        #                         cpos=int(cols[1])
-                        #                         csco=float(cols[2])
-                        #                         cmaf=float(cols[3])
-                        #                         cmac=int(cols[4])
-                        #                         cvar=float(cols[5])
-                        #                         gwasvalues.append([cchr,cpos,csco,cmaf,cmac,cvar])
-                        #                     except ValueError:
-                        #                         #sys.stderr.write("error in line %d: '%s'\n" % (linenr,line.strip()))
-                        #                         continue
+                            #                     try:
+                            #                         cchr=int(cols[0])
+                            #                         cpos=int(cols[1])
+                            #                         csco=float(cols[2])
+                            #                         cmaf=float(cols[3])
+                            #                         cmac=int(cols[4])
+                            #                         cvar=float(cols[5])
+                            #                         gwasvalues.append([cchr,cpos,csco,cmaf,cmac,cvar])
+                            #                     except ValueError:
+                            #                         #sys.stderr.write("error in line %d: '%s'\n" % (linenr,line.strip()))
+                            #                         continue
 
-                        #            gwasvalues=np.array(gwasvalues)
-                        #             print(gwasfilename)
-                        #             print(gwasvalues[:,2])
+                            #            gwasvalues=np.array(gwasvalues)
+                            #             print(gwasfilename)
+                            #             print(gwasvalues[:,2])
 
-            bonf_thres = args.fdr/float(len(gwaspvalues))
+            bonf_thres = args.fdr / float(len(gwaspvalues))
             bh_thres = mt.get_bh_thres(gwaspvalues, args.fdr)['thes_pval']
             bhy_thres = mt.get_bhy_thres(gwaspvalues, args.fdr)['thes_pval']
             try:
@@ -154,13 +163,15 @@ class TairdbSuite(object):
             except ValueError:
                 if args.pvalue_threshold.lower() == 'bonf':
                     used_threshold = bonf_thres
-                    sys.stdout.write("using bonferroni threshold (fdr {}): {:e}\n".format(args.fdr,used_threshold))
+                    sys.stdout.write("using bonferroni threshold (fdr {}): {:e}\n".format(args.fdr, used_threshold))
                 elif args.pvalue_threshold.lower() == 'bh':
                     used_threshold = bh_thres
-                    sys.stdout.write("using benjamini-hochberg threshold (fdr {}): {:e}\n".format(args.fdr, used_threshold))
+                    sys.stdout.write(
+                        "using benjamini-hochberg threshold (fdr {}): {:e}\n".format(args.fdr, used_threshold))
                 elif args.pvalue_threshold.lower() == 'bhy':
                     used_threshold = bhy_thres
-                    sys.stdout.write("using benjamini-hochberg-yekutieli threshold (fdr {}): {:e}\n".format(args.fdr, used_threshold))
+                    sys.stdout.write("using benjamini-hochberg-yekutieli threshold (fdr {}): {:e}\n"
+                                     .format(args.fdr,used_threshold))
                 else:
                     raise Exception("unkown p-value threshold method.")
 
@@ -172,7 +183,11 @@ class TairdbSuite(object):
 
             passed_cnt = 0
             for idx in range(len(gwasvalues)):
-                gw_chr = gwasvalues[idx][0]
+                if dbid == 'Lj':
+                    gw_chr = str(int(gwasvalues[idx][0])-1)
+                else:
+                    gw_chr = gwasvalues[idx][0]
+
                 gw_pos = int(gwasvalues[idx][1])
                 gw_pval = float(gwasvalues[idx][2])
                 gw_mac = int(gwasvalues[idx][4])
@@ -184,80 +199,107 @@ class TairdbSuite(object):
                     genes = dbextract.get_genes()
                     sys.stdout.write("peak: chr{}, pos {} -> {} genes in range\n".format(gw_chr, gw_pos, len(genes)))
 
+                    if len(genes) == 0:
+                        ostream.write("%s\t" % os.path.basename(gwasfilename))
+                        ostream.write("%s\t" % gw_chr)
+                        ostream.write("%s\t" % gw_pos)
+                        ostream.write("%s\t" % gw_pval)
+                        ostream.write("%s\t" % fdr_rejected[idx])
+                        ostream.write("%f\t" % fdr_adjusted[idx])
+                        ostream.write("%e\t" % bonf_thres)
+                        ostream.write("%e\t" % bh_thres)
+                        ostream.write("%e\t" % bhy_thres)
+                        ostream.write("NA\t")
+                        ostream.write("NA\t")
+                        ostream.write("?\t")
+                        ostream.write("NA\t")
+                        ostream.write("NoGeneFound\t")
+                        ostream.write("NoGeneFound\t")
+                        ostream.write("NoGeneFound\t")
+                        # ostream.write("%s\t" % gene.shortsym)
+                        # ostream.write("%s\t" % gene.longsym)
+                        ostream.write("None\t")
+                        ostream.write("None\t")
+                        ostream.write("NoGeneFound\n")
+                        ostream.flush()
+                        continue
                     for gene in genes:
                         ostream.write("%s\t" % os.path.basename(gwasfilename))
                         ostream.write("%s\t" % gw_chr)
                         ostream.write("%s\t" % gw_pos)
                         ostream.write("%s\t" % gw_pval)
-                        ostream.write("%f\t" % fdr_rejected[idx])
+                        ostream.write("%s\t" % fdr_rejected[idx])
                         ostream.write("%f\t" % fdr_adjusted[idx])
+                        ostream.write("%e\t" % bonf_thres)
                         ostream.write("%e\t" % bh_thres)
                         ostream.write("%e\t" % bhy_thres)
-                        ostream.write("%d\t" % gene.loc_start)
-                        ostream.write("%d\t" % gene.loc_end)
-                        ostream.write("%s\t" % gene.orientation)
-                        if gene.orientation == '+':
-                            ostream.write("%d\t" % abs(gene.loc_start - gw_pos))
+                        ostream.write("%d\t" % gene.start)
+                        ostream.write("%d\t" % gene.end)
+                        ostream.write("%s\t" % gene.strand)
+                        if gene.strand == '+':
+                            ostream.write("%d\t" % abs(gene.start - gw_pos))
                         else:
-                            ostream.write("%d\t" % abs(gene.loc_end - gw_pos))
+                            ostream.write("%d\t" % abs(gene.end - gw_pos))
 
-                        if gene.loc_start <= gw_pos <= gene.loc_end:
+                        if gene.start <= gw_pos <= gene.end:
                             relpos = "in gene"
-                        elif gw_pos < gene.loc_start:
-                            if gene.orientation == '+':
+                        elif gw_pos < gene.start:
+                            if gene.strand == '+':
                                 relpos = "upstream"
                             else:
                                 relpos = "downstream"
                         else:
-                            if gene.orientation == '+':
+                            if gene.strand == '+':
                                 relpos = "downstream"
                             else:
                                 relpos = "upstream"
                         ostream.write("%s\t" % relpos)
-                        ostream.write("%s\t" % gene.agi)
-                        ostream.write("%s\t" % gene.type)
-                        ostream.write("%s\t" % gene.shortsym)
-                        ostream.write("%s\t" % gene.longsym)
+                        ostream.write("%s\t" % gene.id)
+                        ostream.write("%s\t" % gene.feature)
+                        # ostream.write("%s\t" % gene.shortsym)
+                        # ostream.write("%s\t" % gene.longsym)
+                        ostream.write("%s\t" % gene.sequencetype)
                         ostream.write("None\t")
-                        ostream.write("%s\n" % gene.attributes)
+                        ostream.write("%s\n" % gene.attribute)
 
-                        if lvl >= 1:
-                            for child in gene.children:
+                        if args.depth >= 1:
+                            for rna in gene.rna:
                                 ostream.write("%s\t" % os.path.basename(gwasfilename))
                                 ostream.write("%s\t" % gw_chr)
                                 ostream.write("%s\t" % gw_pos)
                                 ostream.write("%s\t" % gw_pval)
-                                ostream.write("%f\t" % fdr_rejected[idx])
+                                ostream.write("%s\t" % fdr_rejected[idx])
                                 ostream.write("%f\t" % fdr_adjusted[idx])
+                                ostream.write("%e\t" % bonf_thres)
                                 ostream.write("%e\t" % bh_thres)
                                 ostream.write("%e\t" % bhy_thres)
-                                ostream.write("%d\t" % child.loc_start)
-                                ostream.write("%d\t" % child.loc_end)
-                                ostream.write("%s\t" % gene.orientation)
-                                if gene.orientation == '+':
-                                    ostream.write("%d\t" % abs(child.loc_start - gw_pos))
+                                ostream.write("%d\t" % rna.start)
+                                ostream.write("%d\t" % rna.end)
+                                ostream.write("%s\t" % rna.strand)
+                                if rna.strand == '+':
+                                    ostream.write("%d\t" % abs(rna.start - gw_pos))
                                 else:
-                                    ostream.write("%d\t" % abs(child.loc_end - gw_pos))
+                                    ostream.write("%d\t" % abs(rna.end - gw_pos))
 
-                                if child.loc_start <= gw_pos <= child.loc_end:
+                                if rna.start <= gw_pos <= rna.end:
                                     relpos = "in gene"
-                                elif gw_pos < gene.loc_start:
-                                    if gene.orientation == '+':
+                                elif gw_pos < rna.start:
+                                    if rna.strand == '+':
                                         relpos = "upstream"
                                     else:
                                         relpos = "downstream"
                                 else:
-                                    if gene.orientation == '+':
+                                    if rna.strand == '+':
                                         relpos = "downstream"
                                     else:
                                         relpos = "upstream"
                                 ostream.write("%s\t" % relpos)
-                                ostream.write("%s.%d\t" % (gene.agi, child.model))
-                                ostream.write("%s\t" % child.type)
-                                ostream.write("%s\t" % gene.shortsym)
-                                ostream.write("%s\t" % gene.longsym)
-                                ostream.write("%s\t" % child.description.shortdesc)
-                                ostream.write("%s\n" % child.description.longdesc)
+                                ostream.write("%s\t" % rna.id)
+                                ostream.write("%s\t" % rna.feature)
+                                # ostream.write("%s\t" % gene.shortsym)
+                                ostream.write("%s\t" % rna.sequencetype)
+                                ostream.write("%s\t" % rna.short_annotation)
+                                ostream.write("%s\n" % rna.attribute)
                                 ostream.flush()
             sys.stdout.write("{} peaks passed.\n".format(passed_cnt))
         if isfile:
@@ -280,6 +322,8 @@ class TairdbSuite(object):
 
         extract_by_loc = subparsers.add_parser('extractloc', help='extract elements by locus')
         extract_by_loc.add_argument('--db', required=True, help='path to database')
+        extract_by_loc.add_argument('--depth', type=int, default=1,
+                                    help='defines what to print. 0=genes only, 1=genes and rna, 2=all features')
         extract_by_loc.add_argument('--loc1', type=int,
                                     help='locus 1 (has different meanings depending on other options)')
         extract_by_loc.add_argument('--loc2', type=int, help='locus 2 (different meanings depending on other options)')
@@ -295,6 +339,8 @@ class TairdbSuite(object):
 
         extract_by_agi = subparsers.add_parser('extractagi', help='extract elements by AGI')
         extract_by_agi.add_argument('--db', required=True, help='path to database')
+        extract_by_agi.add_argument('--depth', type=int, default=1,
+                                    help='defines what to print. 0=genes only, 1=genes and rna, 2=all features')
         extract_by_agi.add_argument('--agi', help='single AGI')
         extract_by_agi.add_argument('--file', help='read AGIs from file. The file must contain one AGI per line.')
         extract_by_agi.add_argument('-o', '--output', help='path to output file. Will print to stdout if omitted')
@@ -305,6 +351,8 @@ class TairdbSuite(object):
         hunterparser.add_argument('--dir', required=True, help='directory where to look for pval files')
         hunterparser.add_argument('--name', default="*.pvals",
                                   help='name identifier for the pval files. Unix like globs are allow (e.g. "name*")')
+        hunterparser.add_argument('--depth', type=int, default=1,
+                                    help='defines what to print. 0=genes only, 1=genes and rna, 2=all features')
         hunterparser.add_argument('-u', '--udistance', type=int, default=4000,
                                   help='maximal upstream distance from TSS (default=4000)')
         hunterparser.add_argument('-d', '--ddistance', type=int, default=4000,

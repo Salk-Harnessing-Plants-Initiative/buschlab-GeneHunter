@@ -25,6 +25,7 @@ class Gene(Base):
     frame = Column(String(1))
     attribute = Column(String)
     id = Column(String)
+    sequencetype = Column(String)
 
     rna = relationship("RNA", back_populates="parent")
 
@@ -44,6 +45,8 @@ class RNA(Base):
     frame = Column(String(1))
     attribute = Column(String)
     id = Column(String)
+    sequencetype = Column(String)
+    short_annotation = Column(String)
 
     parent_id = Column(Integer, ForeignKey('genes.internal_id'))
     parent = relationship("Gene", back_populates="rna")
@@ -65,19 +68,20 @@ class Feature(Base):
     frame = Column(String(1))
     attribute = Column(String)
     id = Column(String)
+    sequencetype = Column(String)
 
     parent_id = Column(Integer, ForeignKey('rna.internal_id'))
     parent = relationship("RNA", back_populates="features")
 
 
 # class TairDesc(Base):
-#     __tablename__ = 'tair10desc'
+#     __tablename__ = 'functionaldesc'
 #
-#     id = Column(Integer, primary_key=True)
+#     internal_id = Column(Integer, primary_key=True)
 #     shortdesc = Column(UnicodeText)
-#     curatorsummary = Column(UnicodeText)
 #     longdesc = Column(UnicodeText)
-#     type = Column(String)
-#     model = Column(Integer)
-#     level1_id = Column(Integer, ForeignKey('tair10level1.id'))
-#     level1 = relationship("Tair_Level1", back_populates="description")
+#     # curatorsummary = Column(UnicodeText)
+#     # type = Column(String)
+#     # model = Column(Integer)
+#     parent_id = Column(Integer, ForeignKey('rna.internal_id'))
+#     parent = relationship("RNA", back_populates="description")

@@ -53,9 +53,10 @@ class GeneAnnotationDbCreator(object):
                 if cols[2].lower() == 'gene':
                     gene_start = int(cols[3])
                     gene_end = int(cols[4])
+                    # short_annotation=self._extract_short_annotation(cols[8])
                     gene = Gene(seqname=cols[0], source=cols[1], feature=cols[2], start=gene_start,
                                 end=gene_end, score=cols[5], strand=cols[6], frame=cols[7],
-                                attribute=cols[8], id=attrs['id'])
+                                attribute=attrs.get('additional'), id=attrs.get('id'), sequencetype=attrs.get('sequencetype'))
                     self.session.add(gene)
                     percent_done += 1.0 / total_lines_percent
                     if percent_done - prev_percent_done >= 1.0:
@@ -73,6 +74,15 @@ class GeneAnnotationDbCreator(object):
                         feature_start = int(cols[3])
                         feature_end = int(cols[4])
                         attrs = self._extract_attributes(cols[8])
+                        # try:
+                        #     id = attrs['id']
+                        # except KeyError:
+                        #     id = None  # id was not found in attributes
+                        # try:
+                        #     short_annotation = attrs['annotation']
+                        # except KeyError:
+                        #     short_annotation = None  # annotation was not found in attributes
+
                         if 'chromosome' in cols[2].lower():
                             continue
                         if 'gene' in cols[2].lower():
@@ -80,7 +90,8 @@ class GeneAnnotationDbCreator(object):
                         if 'rna' in cols[2].lower():
                             rna = RNA(seqname=cols[0], source=cols[1], feature=cols[2], start=feature_start,
                                       end=feature_end, score=cols[5], strand=cols[6], frame=cols[7],
-                                      attribute=cols[8], id=attrs['id'])
+                                      attribute=attrs.get('additional'), id=attrs.get('id'), short_annotation=attrs.get('annotation'),
+                                      sequencetype=attrs.get('sequencetype'))
                             gene.rna.append(rna)
                             gene.strand = cols[6]
                         else:
@@ -88,7 +99,8 @@ class GeneAnnotationDbCreator(object):
                                               start=int(cols[3]),
                                               end=int(cols[4]), score=cols[5], strand=cols[6],
                                               frame=cols[7],
-                                              attribute=cols[8], id=attrs['id'])
+                                              attribute=cols[8], id=attrs.get('id'),
+                                              sequencetype=attrs.get('sequencetype'))
                             rna.features.append(feature)
 
                         percent_done += 1 / total_lines_percent
@@ -152,20 +164,20 @@ class GeneAnnotationDbCreator(object):
     #     file_lines = sum(1 for _ in open(desc_filepath))
     #     with open(desc_filepath, 'r') as desc_file:
     #         linenr = 0
-    #         t0 = time.clock()
-    #         tprev = t0
+    #         # t0 = time.clock()
+    #         # tprev = t0
     #         sys.stdout.write("Reading descriptions-file '%s'\n" % desc_filepath)
     #         for line in desc_file:
     #             line = line.strip()
     #
     #             linenr += 1
-    #             tcur = time.clock()
-    #             if tcur - tprev >= 1.0:
-    #                 teta = (tcur - t0) / linenr * (file_lines - linenr)
-    #                 percent_cur = float(linenr) / file_lines * 100.0
-    #                 sys.stdout.write(" %3.2f%% (ETA: %.3fs)\r" % (percent_cur, teta))
-    #                 sys.stdout.flush()
-    #                 tprev = tcur
+    #             # tcur = time.clock()
+    #             # if tcur - tprev >= 1.0:
+    #             #     teta = (tcur - t0) / linenr * (file_lines - linenr)
+    #             #     percent_cur = float(linenr) / file_lines * 100.0
+    #             #     sys.stdout.write(" %3.2f%% (ETA: %.3fs)\r" % (percent_cur, teta))
+    #             #     sys.stdout.flush()
+    #             #     tprev = tcur
     #
     #             cols = line.split('\t')
     #             eagi = cols[0].split('.')
@@ -318,14 +330,46 @@ class GeneAnnotationDbCreator(object):
         cols = re.split(';|,', istr)
 
         attrs = {}
+        attrs['additional'] = ""
         for col in cols:
-            if 'parent' in col.lower():
+            if 'parent=' in col.lower():
                 attrs['parent'] = col.split('=')[1].strip()
-            elif 'id' in col.lower():
+            elif 'id=' in col.lower():
                 attrs['id'] = col.split('=')[1].strip()
-
+            elif "annotation=" in col:
+                anno_str = ""
+                for annocol in col.lstrip('annotation=').split():
+                    if annocol == 'NoHit':
+                        break
+                    if re.search("\||\[|\]", annocol):
+                        break
+                    anno_str += annocol+" "
+                anno_str = anno_str.strip()
+                if len(anno_str) == 0:
+                    anno_str = None
+                attrs['annotation'] = anno_str
+            elif "sequencetype=" in col:
+                attrs['sequencetype'] = col.split('=')[1].strip()
+            else:
+                s = " "
+                attrs['additional'] = s.join((attrs.get('additional'),col))
         return attrs
 
+    # @staticmethod
+    # def _extract_short_annotation(attributes):
+    #     annotation_str = None
+    #     for col in attributes.split(';'):
+    #         if "annotation=" in col:
+    #             annotation_str = col
+    #             break
+    #     short_annotation_str = None
+    #     if annotation_str is not None:
+    #         short_annotation_str = ""
+    #         for col in annotation_str.split():
+    #             if not re.match("\||\[|\]", col):
+    #                 short_annotation_str += col
+    #
+    #     return short_annotation_str
 
 if __name__ == '__main__':
     genedb = GeneAnnotationDbCreator("/data/lotus-annotation/db/lotustest.sqlite")

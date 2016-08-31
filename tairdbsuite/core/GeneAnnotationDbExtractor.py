@@ -5,6 +5,7 @@
 import os
 import sys
 import re
+import unicodedata
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 # from sqlalchemy.orm.exc import *
@@ -39,6 +40,11 @@ class GeneAnnotationDbExtractor:
     def get_genes(self):
         return self.genes
 
+    def get_database_id(self):
+        geneid = self.session.query(Gene.id).distinct().first()[0]
+        dbid = unicodedata.normalize('NFKD', geneid).encode('ascii', 'ignore')[0:2]
+        return dbid
+
     def extract_by_agi(self, agi):
         eagi = agi.split('.')[0]
         #         if(len(eagi)>1):
@@ -46,7 +52,7 @@ class GeneAnnotationDbExtractor:
         #                 emodel=int(eagi[1])
         #             except ValueError:
         #                 emodel=None
-        self.genes.extend(self.session.query(TairGene).filter(TairGene.agi == eagi).all())
+        self.genes.extend(self.session.query(Gene).filter(Gene.id == eagi).all())
 
     def extract_by_agi_list(self, agilist):
         for item in agilist:
@@ -84,26 +90,56 @@ class GeneAnnotationDbExtractor:
             #                               ((TairGene.loc_start >= eloc_start) & (TairGene.loc_start <= eloc_end)) |
             #                               ((TairGene.loc_start < eloc_start) & (TairGene.loc_end > eloc_end))))
 
-    def extract_oriented_loc(self, eloc_start, eloc_end, echrom, eorient):
-        self.genes.extend(self.session.query(TairGene).filter(TairGene.chromosome == echrom)
-                          .filter(TairGene.orientation == eorient)
-                          .filter(((TairGene.loc_end >= eloc_start) & (TairGene.loc_end <= eloc_end)) |
-                                  ((TairGene.loc_start >= eloc_start) & (TairGene.loc_start <= eloc_end)) |
-                                  ((TairGene.loc_start < eloc_start) & (TairGene.loc_end > eloc_end))))
-
+    # def extract_oriented_loc(self, eloc_start, eloc_end, echrom, eorient):
+    #     self.genes.extend(self.session.query(TairGene).filter(TairGene.chromosome == echrom)
+    #                       .filter(TairGene.orientation == eorient)
+    #                       .filter(((TairGene.loc_end >= eloc_start) & (TairGene.loc_end <= eloc_end)) |
+    #                               ((TairGene.loc_start >= eloc_start) & (TairGene.loc_start <= eloc_end)) |
+    #                               ((TairGene.loc_start < eloc_start) & (TairGene.loc_end > eloc_end))))
+    #
     def extract_loc_uddist(self, echr, eloc, udist, ddist):
-        self.genes.extend(self.session.query(TairGene)
-                          .filter(TairGene.chromosome == echr)
-                          .filter(TairGene.orientation == '+')
-                          .filter(
-            ((TairGene.loc_start - udist) <= eloc) & ((TairGene.loc_end + ddist) >= eloc)).all())
-        self.genes.extend(self.session.query(TairGene)
-                          .filter(TairGene.chromosome == echr)
-                          .filter(TairGene.orientation == '-')
-                          .filter(
-            ((TairGene.loc_end + udist) >= eloc) & ((TairGene.loc_start - ddist) <= eloc)).all())
+        try:
+            int(echr)
+            chr_int_search = True
+        except ValueError:
+            chr_int_search = False
 
-    def write_results(self, outpath=None, lvl=""):
+        if chr_int_search:
+            regexstr = "[a-z_]{0,}" + echr
+            self.genes.extend(self.session.query(Gene).filter(Gene.seqname.op('regexp')(regexstr))
+                              .filter(Gene.strand == '+')
+                              .filter(Gene.start.between(eloc - udist, eloc + ddist) |
+                                      Gene.end.between(eloc - udist, eloc + ddist) |
+                                      ((Gene.start <= eloc) & (Gene.end >= eloc))))
+            self.genes.extend(self.session.query(Gene).filter(Gene.seqname.op('regexp')(regexstr))
+                              .filter(Gene.strand == '-')
+                              .filter(Gene.start.between(eloc - ddist, eloc + udist) |
+                                      Gene.end.between(eloc - ddist, eloc + udist) |
+                                      ((Gene.start <= eloc) & (Gene.end >= eloc))))
+        else:
+            self.genes.extend(self.session.query(Gene).filter(Gene.seqname == echr)
+                              .filter(Gene.strand == '+')
+                              .filter(Gene.start.between(eloc-udist, eloc+ddist) |
+                                      Gene.end.between(eloc-udist, eloc+ddist) |
+                                      ((Gene.start <= eloc) & (Gene.end >= eloc))))
+            self.genes.extend(self.session.query(Gene).filter(Gene.seqname == echr)
+                              .filter(Gene.strand == '-')
+                              .filter(Gene.start.between(eloc - ddist, eloc + udist) |
+                                      Gene.end.between(eloc - ddist, eloc + udist) |
+                                      ((Gene.start <= eloc) & (Gene.end >= eloc))))
+
+        # self.genes.extend(self.session.query(TairGene)
+        #                   .filter(TairGene.chromosome == echr)
+        #                   .filter(TairGene.orientation == '+')
+        #                   .filter(
+        #     ((TairGene.loc_start - udist) <= eloc) & ((TairGene.loc_end + ddist) >= eloc)).all())
+        # self.genes.extend(self.session.query(TairGene)
+        #                   .filter(TairGene.chromosome == echr)
+        #                   .filter(TairGene.orientation == '-')
+        #                   .filter(
+        #     ((TairGene.loc_end + udist) >= eloc) & ((TairGene.loc_start - ddist) <= eloc)).all())
+
+    def write_results(self, outpath=None, depth=0):
         if outpath is not None:
             ostream = open(outpath, 'w')
             isfile = True
@@ -111,8 +147,8 @@ class GeneAnnotationDbExtractor:
             ostream = sys.stdout
             isfile = False
 
-        ostream.write("Chromosome\tLoc_start\tLoc_end\tOrientation\tAGI\tType\t")
-        ostream.write("Short_sym\tLong_sym\tShort_Desc\tLong_Desc\n")
+        ostream.write("Chromosome\tLoc_start\tLoc_end\tOrientation\tAGI\tType\tAttributes\n")
+        # ostream.write("Short_sym\tLong_sym\tShort_Desc\tLong_Desc\n")
         for gene in self.genes:
             ostream.write(str(gene.seqname) + "\t")
             ostream.write(str(gene.start) + "\t")
@@ -125,31 +161,31 @@ class GeneAnnotationDbExtractor:
             ostream.write("\t")
             ostream.write(str(gene.attribute) + "\n")
 
-            # if lvl >= 1:
-            #     for child in gene.children:
-            #         desc = child.description
-            #         ostream.write(str(gene.chromosome) + "\t")
-            #         ostream.write(str(child.loc_start) + "\t")
-            #         ostream.write(str(child.loc_end) + "\t")
-            #         ostream.write(str(gene.orientation) + "\t")
-            #         ostream.write(str(gene.agi) + "." + str(child.model) + "\t")
-            #         ostream.write(str(child.type) + "\t")
-            #         ostream.write(str(gene.shortsym) + "\t")
-            #         ostream.write(str(gene.longsym) + "\t")
-            #         ostream.write(str(desc.shortdesc) + "\t")
-            #         ostream.write(str(desc.longdesc) + "\n")
-            #
-            #         if lvl >= 2:
-            #             for subchild in child.children:
-            #                 ostream.write(str(gene.chromosome) + "\t")
-            #                 ostream.write(str(subchild.loc_start) + "\t")
-            #                 ostream.write(str(subchild.loc_end) + "\t")
-            #                 ostream.write(str(gene.orientation) + "\t")
-            #                 ostream.write(str(gene.agi) + "." + str(child.model) + "\t")
-            #                 ostream.write(str(subchild.type) + "\t")
-            #                 ostream.write(str(gene.shortsym) + "\t")
-            #                 ostream.write(str(gene.longsym) + "\t")
-            #                 ostream.write(str(desc.shortdesc) + "\t")
-            #                 ostream.write(str(desc.longdesc) + "\n")
+            if depth >= 1:
+                for rna in gene.rna:
+                    # desc = rna.description
+                    ostream.write(str(rna.seqname) + "\t")
+                    ostream.write(str(rna.start) + "\t")
+                    ostream.write(str(rna.end) + "\t")
+                    ostream.write(str(rna.strand) + "\t")
+                    ostream.write(str(rna.id) + "\t")
+                    ostream.write(str(rna.feature) + "\t")
+                    # ostream.write(str(rna.shortsym) + "\t")
+                    # ostream.write(str(rna.longsym) + "\t")
+                    # ostream.write(str(desc.shortdesc) + "\t")
+                    ostream.write(str(rna.attribute) + "\n")
+
+                    if depth >= 2:
+                        for feature in rna.features:
+                            ostream.write(str(feature.seqname) + "\t")
+                            ostream.write(str(feature.start) + "\t")
+                            ostream.write(str(feature.end) + "\t")
+                            ostream.write(str(feature.strand) + "\t")
+                            ostream.write(str(feature.id) + "\t")
+                            ostream.write(str(feature.feature) + "\t")
+                            # ostream.write(str(gene.shortsym) + "\t")
+                            # ostream.write(str(gene.longsym) + "\t")
+                            # ostream.write(str(desc.shortdesc) + "\t")
+                            ostream.write(str(feature.attribute) + "\n")
         if isfile:
             ostream.close()
