@@ -1,3 +1,0 @@
-[console_scripts]
-tairdbsuite = tairdbsuite.tairdbsuite:main
-

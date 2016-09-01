@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""tairdbsuite.tairdb_models: module defining the classes which are mapped to the database by sqlalchemy."""
+"""genehunter.tairdb_models: module defining the classes which are mapped to the database by sqlalchemy."""
 
 from sqlalchemy import Column, Integer, Float, String, ForeignKey
 from sqlalchemy.orm import relationship

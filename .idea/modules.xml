@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/TairDBSuite.iml" filepath="$PROJECT_DIR$/.idea/TairDBSuite.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/GeneHunter.iml" filepath="$PROJECT_DIR$/.idea/GeneHunter.iml" />
     </modules>
   </component>
 </project>

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""tairdbsuite.tairdb_extractor: module for querying the database."""
+"""genehunter.tairdb_extractor: module for querying the database."""
 
 import os
 import sys

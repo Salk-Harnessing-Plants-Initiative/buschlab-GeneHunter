@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""tairdbsuite.tairdb_creator: module for database creation."""
+"""genehunter.tairdb_creator: module for database creation."""
 
 import os
 import sys

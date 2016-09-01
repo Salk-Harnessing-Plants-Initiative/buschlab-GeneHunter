@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""tairdbsuite.tairdbsuite: module doing the argument parsing and dispatching the commands."""
+"""genehunter.genehunter: module doing the argument parsing and dispatching the commands."""
 
 import sys
 import os
@@ -9,19 +9,19 @@ import glob
 import argparse
 import statsmodels.sandbox.stats.multicomp as sm
 # import numpy as np
-import tairdbsuite.core.mtcorr as mt
-from tairdbsuite.core.GeneAnnotationDbCreator import GeneAnnotationDbCreator
-from tairdbsuite.core.GeneAnnotationDbExtractor import GeneAnnotationDbExtractor
+import genehunter.core.mtcorr as mt
+from genehunter.core.GeneAnnotationDbCreator import GeneAnnotationDbCreator
+from genehunter.core.GeneAnnotationDbExtractor import GeneAnnotationDbExtractor
 
 __version__ = "0.1.1"
 
 
 def main():
-    sys.stdout.write("tair database suite - version %s\n" % __version__)
-    TairdbSuite()
+    sys.stdout.write("gene annotation database - version %s\n" % __version__)
+    GeneAnnotator()
 
 
-class TairdbSuite(object):
+class GeneAnnotator(object):
     def __init__(self):
         self.parse_arguments()
 
@@ -39,12 +39,12 @@ class TairdbSuite(object):
             raise Exception("cannot open sORF file '%s'! Terminating!\n" % args.sorf)
         creator = GeneAnnotationDbCreator(args.output)
         creator.create_gff_entries(args.gff)
-        if args.desc is not None:
-            creator.create_desc_entries(args.desc)
-        if args.aliases is not None:
-            creator.create_name_entries(args.aliases)
-        if args.sorf is not None:
-            creator.create_sorf_entries(args.sorf)
+        # if args.desc is not None:
+        #     creator.create_desc_entries(args.desc)
+        # if args.aliases is not None:
+        #     creator.create_name_entries(args.aliases)
+        # if args.sorf is not None:
+        #     creator.create_sorf_entries(args.sorf)
         return
 
     @staticmethod
@@ -307,7 +307,7 @@ class TairdbSuite(object):
 
     def parse_arguments(self):
         mainparser = argparse.ArgumentParser(description='tair database suite',
-                                             prog="tairdbsuite")  # ,usage='tairdbsuite command [<args>]')
+                                             prog="genehunter")  # ,usage='genehunter command [<args>]')
         subparsers = mainparser.add_subparsers(dest='command', help='subcommand help')
         subparsers.required = True
 
@@ -346,7 +346,7 @@ class TairdbSuite(object):
         extract_by_agi.add_argument('-o', '--output', help='path to output file. Will print to stdout if omitted')
         extract_by_agi.set_defaults(func=self.extract_agi)
 
-        hunterparser = subparsers.add_parser('hunter', help='run gene hunter on pvals and extract gene information')
+        hunterparser = subparsers.add_parser('hunt', help='run gene hunter on pvals and extract gene information')
         hunterparser.add_argument('--db', required=True, help='path to tair10 database')
         hunterparser.add_argument('--dir', required=True, help='directory where to look for pval files')
         hunterparser.add_argument('--name', default="*.pvals",
