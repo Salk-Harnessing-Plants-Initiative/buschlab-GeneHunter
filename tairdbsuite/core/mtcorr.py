@@ -41,8 +41,8 @@ def get_bhy_thres(pvals, fdr_thres=0.05):
 def bh_test():
     import random
     pvals = [random.random() for i in range(250000)]
-    print 'BHY', get_bhy_thres(pvals, fdr_thres=0.05)
-    print 'BH', get_bh_thres(pvals, fdr_thres=0.05)
+    print('BHY: {}'.format(get_bhy_thres(pvals, fdr_thres=0.05)))
+    print('BH : {}'.format(get_bh_thres(pvals, fdr_thres=0.05)))
 
 
 if __name__ == '__main__':
