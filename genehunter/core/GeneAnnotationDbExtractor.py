@@ -11,7 +11,6 @@ from sqlalchemy.orm import sessionmaker
 # from sqlalchemy.orm.exc import *
 # from sqlalchemy import and_, or_
 
-from .TairDBModels import TairGene  # , Tair_Level1, Tair_Level2, Tair_Desc
 from .GeneAnnotationDbModels import Gene
 
 
