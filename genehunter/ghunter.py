@@ -183,7 +183,7 @@ class GeneAnnotator(object):
 
             passed_cnt = 0
             for idx in range(len(gwasvalues)):
-                if dbid == 'Lj':
+                if dbid == 'Lj'.encode():
                     gw_chr = str(int(gwasvalues[idx][0])-1)
                 else:
                     gw_chr = gwasvalues[idx][0]
