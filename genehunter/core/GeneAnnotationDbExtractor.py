@@ -21,6 +21,7 @@ def _re_fn(expr, item):
 
 class GeneAnnotationDbExtractor:
     def __init__(self, dbpath):
+        self.dbpath = dbpath
         self.genes = []
         self.engine = create_engine('sqlite:///' + dbpath, echo=False)
         if not os.path.isfile(dbpath):
@@ -38,6 +39,11 @@ class GeneAnnotationDbExtractor:
 
     def get_genes(self):
         return self.genes
+
+    def print_stats(self):
+        allgenes = self.session.query(Gene.id).all()
+        sys.stdout.write("database: {} contains:\n".format(self.dbpath))
+        sys.stdout.write("\t {:d} genes.\n".format(len(allgenes)))
 
     def get_database_id(self):
         geneid = self.session.query(Gene.id).distinct().first()[0]

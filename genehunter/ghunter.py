@@ -48,6 +48,14 @@ class GeneAnnotator(object):
         return
 
     @staticmethod
+    def print_stats(args):
+        if not os.path.exists(args.db):
+            raise Exception("cannot open database '%s'!" % args.db)
+
+        extractor = GeneAnnotationDbExtractor(args.db)
+        extractor.print_stats()
+
+    @staticmethod
     def extract_loc(args):
         intervals = []
         if not os.path.exists(args.db):
@@ -183,10 +191,14 @@ class GeneAnnotator(object):
 
             passed_cnt = 0
             for idx in range(len(gwasvalues)):
-                if dbid == 'Lj'.encode():
-                    gw_chr = str(int(gwasvalues[idx][0])-1)
-                else:
-                    gw_chr = gwasvalues[idx][0]
+                # Lotus pvalue files now use chromosome numbering from 0:6
+                # conversion is not needed anymore
+
+                # if dbid == 'Lj'.encode():
+                #     gw_chr = str(int(gwasvalues[idx][0])-1)
+                # else:
+                #     gw_chr = gwasvalues[idx][0]
+                gw_chr = gwasvalues[idx][0]
 
                 gw_pos = int(gwasvalues[idx][1])
                 gw_pval = float(gwasvalues[idx][2])
@@ -366,6 +378,10 @@ class GeneAnnotator(object):
         hunterparser.add_argument('-f', '--fdr', type=float, default=0.05,
                                   help="alpha for fdr threshold calculation")
         hunterparser.set_defaults(func=self.extract_hunter)
+
+        statusparser = subparsers.add_parser('stats', help='get some statistics about database')
+        statusparser.add_argument('--db', required=True, help='path to gene annotation database')
+        statusparser.set_defaults(func=self.print_stats)
 
         args = mainparser.parse_args()
         args.func(args)
