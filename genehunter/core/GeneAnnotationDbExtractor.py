@@ -43,7 +43,33 @@ class GeneAnnotationDbExtractor:
     def print_stats(self):
         allgenes = self.session.query(Gene.id).all()
         sys.stdout.write("database: {} contains:\n".format(self.dbpath))
-        sys.stdout.write("\t {:d} genes.\n".format(len(allgenes)))
+        sys.stdout.write("\t {:d} genes in total.\n".format(len(allgenes)))
+
+        ljcnt = 0
+        ljchlorocnt = 0
+        ljmitocnt = 0
+        othercnt = 0
+        ljPattern = '^Lj\dg'
+        ljchloroPattern = '^Ljchlorog'
+        ljmitoPattern = '^Ljmitog'
+        ljset = []
+        for id in allgenes:
+            if re.match(ljPattern,id[0]):
+                ljcnt += 1
+                ljset.append(id[0])
+                if len(id[0]) != 13:
+                    pass
+            elif re.match(ljchloroPattern,id[0]):
+                ljchlorocnt += 1
+            elif re.match(ljmitoPattern, id[0]):
+                ljmitocnt += 1
+            else:
+                othercnt += 1
+        sys.stdout.write("\t {:d} Lj... genes.\n".format(ljcnt))
+        sys.stdout.write("\t {:d} unique Lj... genes.\n".format(len(set(ljset))))
+        sys.stdout.write("\t {:d} Ljchloro... genes.\n".format(ljchlorocnt))
+        sys.stdout.write("\t {:d} Ljmito... genes.\n".format(ljmitocnt))
+        sys.stdout.write("\t {:d} other genes.\n".format(othercnt))
 
     def get_database_id(self):
         geneid = self.session.query(Gene.id).distinct().first()[0]
