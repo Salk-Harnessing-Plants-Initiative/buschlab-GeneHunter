@@ -14,6 +14,7 @@ from .TairDBModels import TairGene  # , Tair_Level1, Tair_Level2, Tair_Desc
 
 class TairDBExtractor:
     def __init__(self, dbpath):
+        self.dbpath = dbpath
         self.genes = []
         self.engine = create_engine('sqlite:///' + dbpath, echo=False)
         if not os.path.isfile(dbpath):
@@ -29,6 +30,21 @@ class TairDBExtractor:
 
     def get_genes(self):
         return self.genes
+
+    def print_stats(self):
+        allgenes = self.session.query(TairGene.agi).all()
+        sys.stdout.write("database: {} contains:\n".format(self.dbpath))
+        sys.stdout.write("\t {:d} genes in total.\n".format(len(allgenes)))
+
+        sorfcnt = 0
+        atcnt = 0
+        for agi in allgenes:
+            if(agi[0].lower().startswith("at")):
+                atcnt += 1
+            elif(agi[0].lower().startswith("sorf")):
+                sorfcnt += 1
+        sys.stdout.write("\t {:d} AT... genes.\n".format(atcnt))
+        sys.stdout.write("\t {:d} sORF... genes.\n".format(sorfcnt))
 
     def extract_by_agi(self, agi):
         eagi = agi.split('.')[0]

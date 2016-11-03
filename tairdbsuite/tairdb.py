@@ -48,6 +48,14 @@ class TairdbSuite(object):
         return
 
     @staticmethod
+    def print_stats(args):
+        if not os.path.exists(args.db):
+            raise Exception("cannot open database '%s'!" % args.db)
+
+        extractor = TairDBExtractor(args.db)
+        extractor.print_stats()
+
+    @staticmethod
     def extract_loc(args):
         intervals = []
         if not os.path.exists(args.db):
@@ -320,6 +328,10 @@ class TairdbSuite(object):
         hunterparser.add_argument('-f', '--fdr', type=float, default=0.05,
                                   help="alpha for fdr threshold calculation")
         hunterparser.set_defaults(func=self.extract_hunter)
+
+        statusparser = subparsers.add_parser('stats', help='get some statistics about database')
+        statusparser.add_argument('--db', required=True, help='path to gene annotation database')
+        statusparser.set_defaults(func=self.print_stats)
 
         args = mainparser.parse_args()
         args.func(args)
