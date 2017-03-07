@@ -7,11 +7,13 @@ import os
 import re
 import glob
 import argparse
+import pandas as pd
 import statsmodels.sandbox.stats.multicomp as sm
 # import numpy as np
 import genehunter.core.mtcorr as mt
 from genehunter.core.GeneAnnotationDbCreator import GeneAnnotationDbCreator
 from genehunter.core.GeneAnnotationDbExtractor import GeneAnnotationDbExtractor
+from genehunter.core.HunterData import InputData
 
 __version__ = "0.1.1"
 
@@ -24,6 +26,8 @@ def main():
 class GeneAnnotator(object):
     def __init__(self):
         self.parse_arguments()
+        self.inputdata = None
+
 
     @staticmethod
     def create_db(args):
@@ -55,26 +59,46 @@ class GeneAnnotator(object):
         extractor = GeneAnnotationDbExtractor(args.db)
         extractor.print_stats()
 
-    @staticmethod
-    def extract_loc(args):
+    def extract_loc(self, args):
         intervals = []
+        self.inputdata = InputData(fdr=args.fdr)
         if not os.path.exists(args.db):
             raise Exception("cannot open database '%s'!" % args.db)
 
         if args.file is not None:
             with open(args.file, 'r') as ifile:
                 for line in ifile:
+                    dseries = pd.Series()
                     cols = re.split(',|\t', line)
                     chrom = cols[0].strip()
                     pos = int(cols[1].strip())
+                    dseries["Chromosome"] = chrom
+                    dseries["SNP_pos"] = pos
                     if len(cols) == 2:
-                        intervals.append((chrom, pos - args.loc1, pos + args.loc2))
+                        dseries["uDist"] = args.loc1
+                        dseries["dDist"] = args.loc2
+                        # intervals.append((chrom, pos - args.loc1, pos + args.loc2))
                     else:
-                        intervals.append((chrom, pos - int(cols[2].strip()), pos + int(cols[3].strip())))
+                        dseries["uDist"] = int(cols[2].strip())
+                        dseries["dDist"] = int(cols[3].strip())
+                        # intervals.append((chrom, pos - int(cols[2].strip()), pos + int(cols[3].strip())))
+                    self.inputdata.add_dataset(dseries)
         elif args.c:
-            intervals.append((args.chr, args.loc1 - args.loc2, args.loc1 + args.loc2))
+            dseries = pd.Series()
+            dseries["Chromosome"] = args.chr
+            dseries["SNP_pos"] = args.loc1
+            dseries["uDist"] = args.loc2
+            dseries["dDist"] = args.loc2
+            self.inputdata.add_dataset(dseries)
+            # intervals.append((args.chr, args.loc1 - args.loc2, args.loc1 + args.loc2))
         elif args.i:
-            intervals.append((args.chr, args.loc1, args.loc2))
+            dseries = pd.Series()
+            dseries["Chromosome"] = args.chr
+            dseries["SNP_pos"] = (args.loc1 + args.loc2) / 2
+            dseries["uDist"] = (args.loc2 - args.loc1) / 2
+            dseries["dDist"] = (args.loc2 - args.loc1) / 2
+            self.inputdata.add_dataset(dseries)
+            # intervals.append((args.chr, args.loc1, args.loc2))
 
         extractor = GeneAnnotationDbExtractor(args.db)
         for interval in intervals:
@@ -316,6 +340,8 @@ class GeneAnnotator(object):
             sys.stdout.write("{} peaks passed.\n".format(passed_cnt))
         if isfile:
             ostream.close()
+
+
 
     def parse_arguments(self):
         mainparser = argparse.ArgumentParser(description='tair database suite',
