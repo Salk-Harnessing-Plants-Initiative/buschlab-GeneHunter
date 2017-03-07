@@ -130,7 +130,7 @@ class TairdbSuite(object):
                 for line in gwasfile:
                     linenr += 1
                     cols = re.split(',|\t', line)
-                    if len(cols) == 6:
+                    if len(cols) == 5:
                         try:
                             gwaspvalues.append(float(cols[2]))
                             gwasvalues.append(cols)
