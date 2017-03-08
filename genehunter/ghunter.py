@@ -8,8 +8,8 @@ import re
 import glob
 import argparse
 import pandas as pd
+import numpy as np
 import statsmodels.sandbox.stats.multicomp as sm
-# import numpy as np
 import genehunter.core.mtcorr as mt
 from genehunter.core.GeneAnnotationDbCreator import GeneAnnotationDbCreator
 from genehunter.core.GeneAnnotationDbExtractor import GeneAnnotationDbExtractor
@@ -61,28 +61,36 @@ class GeneAnnotator(object):
 
     def extract_loc(self, args):
         intervals = []
-        self.inputdata = InputData(fdr=args.fdr)
+        self.inputdata = InputData()
         if not os.path.exists(args.db):
             raise Exception("cannot open database '%s'!" % args.db)
 
         if args.file is not None:
-            with open(args.file, 'r') as ifile:
-                for line in ifile:
-                    dseries = pd.Series()
-                    cols = re.split(',|\t', line)
-                    chrom = cols[0].strip()
-                    pos = int(cols[1].strip())
-                    dseries["Chromosome"] = chrom
-                    dseries["SNP_pos"] = pos
-                    if len(cols) == 2:
-                        dseries["uDist"] = args.loc1
-                        dseries["dDist"] = args.loc2
-                        # intervals.append((chrom, pos - args.loc1, pos + args.loc2))
-                    else:
-                        dseries["uDist"] = int(cols[2].strip())
-                        dseries["dDist"] = int(cols[3].strip())
-                        # intervals.append((chrom, pos - int(cols[2].strip()), pos + int(cols[3].strip())))
-                    self.inputdata.add_dataset(dseries)
+            in_df = pd.read_csv(args.file, sep=',')
+            # with open(args.file, 'r') as ifile:
+            #     for line in ifile:
+            #         dseries = pd.Series()
+            #         cols = re.split(',|\t', line)
+            #         chrom = cols[0].strip()
+            #         pos = int(cols[1].strip())
+            #         dseries["Chromosome"] = chrom
+            #         dseries["SNP_pos"] = pos
+            #         if len(cols) == 2:
+            #             dseries["uDist"] = args.loc1
+            #             dseries["dDist"] = args.loc2
+            #             # intervals.append((chrom, pos - args.loc1, pos + args.loc2))
+            #         else:
+            #             dseries["uDist"] = int(cols[2].strip())
+            #             dseries["dDist"] = int(cols[3].strip())
+            #             # intervals.append((chrom, pos - int(cols[2].strip()), pos + int(cols[3].strip())))
+            self.inputdata.df["Chromosome"] = in_df.iloc[:, 0].astype(np.str)
+            self.inputdata.df["SNP_pos"] = in_df.iloc[:, 1].astype(np.int)
+            if in_df.shape[1] > 2:
+                self.inputdata.df["uDist"] = in_df.iloc[:, 2].astype(np.int)
+                self.inputdata.df["dDist"] = in_df.iloc[:, 3].astype(np.int)
+            else:
+                self.inputdata.df["uDist"] = args.loc1
+                self.inputdata.df["dDist"] = args.loc2
         elif args.c:
             dseries = pd.Series()
             dseries["Chromosome"] = args.chr
@@ -101,9 +109,12 @@ class GeneAnnotator(object):
             # intervals.append((args.chr, args.loc1, args.loc2))
 
         extractor = GeneAnnotationDbExtractor(args.db)
-        for interval in intervals:
-            extractor.extract_by_loc(interval[1], interval[2], interval[0])
-        extractor.write_results(args.output, args.depth)
+        outdf = extractor.extract_by_loc(self.inputdata)
+        outdf.write_csv(args.output)
+
+        # for interval in intervals:
+        #     extractor.extract_by_loc(interval[1], interval[2], interval[0])
+        # extractor.write_results(args.output, args.depth)
 
         return
 

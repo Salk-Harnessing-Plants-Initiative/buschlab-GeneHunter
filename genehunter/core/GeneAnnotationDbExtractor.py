@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 # from sqlalchemy.orm.exc import *
 # from sqlalchemy import and_, or_
-
+from genehunter.core.HunterData import OutputData
 from .GeneAnnotationDbModels import Gene
 
 
@@ -129,20 +129,21 @@ class GeneAnnotationDbExtractor:
     #                               ((TairGene.loc_start >= eloc_start) & (TairGene.loc_start <= eloc_end)) |
     #                               ((TairGene.loc_start < eloc_start) & (TairGene.loc_end > eloc_end))))
     #
-    def extract_by_loc(self, inputdata):
-        for ix in inputdata.index:
-            dseries = inputdata.loc[ix]
-            genes = self.extract_loc_uddist(dseries["Chromosome"], dseries["SNP_pos", dseries["uDist"], dseries["dDist"]])
+    def extract_by_loc(self, inputdata, infodepth=1):
+        output_df = OutputData()
+        for ix in inputdata.df.index:
+            dseries = inputdata.df.loc[ix]
+            genes = self.extract_loc_uddist(dseries["Chromosome"], dseries["SNP_pos"], dseries["uDist"], dseries["dDist"])
             for gene in genes:
-                os = pd.Series()
-                os.iloc[0:3] = dseries.iloc[0:3]
-                os["Gene_start"] = gene.start
-                os["Gene_end"] = gene.end
-                os["Gene_orientation"] = gene.strand
+                out_series = pd.Series()
+                out_series.iloc[0:3] = dseries.iloc[0:3]
+                out_series["Gene_start"] = gene.start
+                out_series["Gene_end"] = gene.end
+                out_series["Gene_orientation"] = gene.strand
                 if gene.strand == '+':
-                    os["Relative_Distance"] = dseries["SNP_pos"] - gene.start
+                    out_series["Relative_Distance"] = dseries["SNP_pos"] - gene.start
                 else:
-                    os["Relative_Distance"] = gene.start - dseries["SNP_pos"]
+                    out_series["Relative_Distance"] = gene.start - dseries["SNP_pos"]
                 if gene.start <= dseries["SNP_pos"] <= gene.end:
                     relpos = "in gene"
                 elif dseries["SNP_pos"] < gene.start:
@@ -155,23 +156,53 @@ class GeneAnnotationDbExtractor:
                         relpos = "downstream"
                     else:
                         relpos = "upstream"
-                os["SNP_relative_position"] = relpos
-                os["target_AGI"] = gene.id
-                os["target_element_type"] = gene.feature
-                os["target_sequence_type"] = gene.sequencetype
-                os["target_attributes"] = gene.attribute
+                out_series["SNP_relative_position"] = relpos
+                out_series["target_AGI"] = gene.id
+                out_series["target_element_type"] = gene.feature
+                out_series["target_sequence_type"] = gene.sequencetype
+                out_series["target_attributes"] = gene.attribute
+                output_df.add_dataset(out_series)
 
-                ostream.write(str(gene.seqname) + "\t")
-                ostream.write(str(gene.start) + "\t")
-                ostream.write(str(gene.end) + "\t")
-                ostream.write(str(gene.strand) + "\t")
-                ostream.write(str(gene.id) + "\t")
-                ostream.write(str(gene.feature) + "\t")
-                # ostream.write(str(gene.shortsym) + "\t")
-                # ostream.write(str(gene.longsym) + "\t")
-                ostream.write("\t")
-                ostream.write(str(gene.attribute) + "\n")
-   def extract_loc_uddist(self, echr, eloc, udist, ddist):
+                if infodepth > 0:
+                    rna = gene.rna
+                    out_series["Gene_start"] = rna.start
+                    out_series["Gene_end"] = rna.end
+                    out_series["Gene_orientation"] = rna.strand
+                    if rna.strand == '+':
+                        out_series["Relative_Distance"] = dseries["SNP_pos"] - rna.start
+                    else:
+                        out_series["Relative_Distance"] = rna.start - dseries["SNP_pos"]
+                    if rna.start <= dseries["SNP_pos"] <= rna.end:
+                        relpos = "in gene"
+                    elif dseries["SNP_pos"] < rna.start:
+                        if rna.strand == '+':
+                            relpos = "upstream"
+                        else:
+                            relpos = "downstream"
+                    else:
+                        if rna.strand == '+':
+                            relpos = "downstream"
+                        else:
+                            relpos = "upstream"
+                    out_series["SNP_relative_position"] = relpos
+                    out_series["target_AGI"] = rna.id
+                    out_series["target_element_type"] = rna.feature
+                    out_series["target_sequence_type"] = rna.sequencetype
+                    out_series["target_attributes"] = rna.attribute
+                    output_df.add_dataset(out_series)
+                # ostream.write(str(gene.seqname) + "\t")
+                # ostream.write(str(gene.start) + "\t")
+                # ostream.write(str(gene.end) + "\t")
+                # ostream.write(str(gene.strand) + "\t")
+                # ostream.write(str(gene.id) + "\t")
+                # ostream.write(str(gene.feature) + "\t")
+                # # ostream.write(str(gene.shortsym) + "\t")
+                # # ostream.write(str(gene.longsym) + "\t")
+                # ostream.write("\t")
+                # ostream.write(str(gene.attribute) + "\n")
+        return output_df
+
+    def extract_loc_uddist(self, echr, eloc, udist, ddist):
         genes = []
         try:
             int(echr)
@@ -182,10 +213,10 @@ class GeneAnnotationDbExtractor:
         if chr_int_search:
             regexstr = "[a-z_]{0,}" + echr
             genes.extend(self.session.query(Gene).filter(Gene.seqname.op('regexp')(regexstr))
-                              .filter(Gene.strand == '+')
-                              .filter(Gene.start.between(eloc - udist, eloc + ddist) |
-                                      Gene.end.between(eloc - udist, eloc + ddist) |
-                                      ((Gene.start <= eloc) & (Gene.end >= eloc))))
+                         .filter(Gene.strand == '+')
+                         .filter(Gene.start.between(eloc - udist, eloc + ddist) |
+                                 Gene.end.between(eloc - udist, eloc + ddist) |
+                                 ((Gene.start <= eloc) & (Gene.end >= eloc))))
             genes.extend(self.session.query(Gene).filter(Gene.seqname.op('regexp')(regexstr))
                               .filter(Gene.strand == '-')
                               .filter(Gene.start.between(eloc - ddist, eloc + udist) |
