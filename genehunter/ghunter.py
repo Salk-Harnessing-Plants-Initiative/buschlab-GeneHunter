@@ -66,7 +66,7 @@ class GeneAnnotator(object):
             raise Exception("cannot open database '%s'!" % args.db)
 
         if args.file is not None:
-            in_df = pd.read_csv(args.file, sep=',')
+            in_df = pd.read_csv(args.file, sep=',', header=None)
             # with open(args.file, 'r') as ifile:
             #     for line in ifile:
             #         dseries = pd.Series()
@@ -84,10 +84,10 @@ class GeneAnnotator(object):
             #             dseries["dDist"] = int(cols[3].strip())
             #             # intervals.append((chrom, pos - int(cols[2].strip()), pos + int(cols[3].strip())))
             self.inputdata.df["Chromosome"] = in_df.iloc[:, 0].astype(np.str)
-            self.inputdata.df["SNP_pos"] = in_df.iloc[:, 1].astype(np.int)
+            self.inputdata.df["SNP_pos"] = in_df.iloc[:, 1].astype(np.int32)
             if in_df.shape[1] > 2:
-                self.inputdata.df["uDist"] = in_df.iloc[:, 2].astype(np.int)
-                self.inputdata.df["dDist"] = in_df.iloc[:, 3].astype(np.int)
+                self.inputdata.df["uDist"] = in_df.iloc[:, 2].astype(np.int32)
+                self.inputdata.df["dDist"] = in_df.iloc[:, 3].astype(np.int32)
             else:
                 self.inputdata.df["uDist"] = args.loc1
                 self.inputdata.df["dDist"] = args.loc2

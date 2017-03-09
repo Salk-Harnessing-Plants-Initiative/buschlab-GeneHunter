@@ -7,6 +7,7 @@ import sys
 import re
 import unicodedata
 import pandas as pd
+import numpy as np
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 # from sqlalchemy.orm.exc import *
@@ -134,16 +135,22 @@ class GeneAnnotationDbExtractor:
         for ix in inputdata.df.index:
             dseries = inputdata.df.loc[ix]
             genes = self.extract_loc_uddist(dseries["Chromosome"], dseries["SNP_pos"], dseries["uDist"], dseries["dDist"])
+            tmp_df = dseries.iloc[0:3]
+
+            if len(genes) == 0:
+                tmp_df["target_AGI"] = "NoGeneFound"
+                output_df.add_dataset(tmp_df)
+                continue
+
             for gene in genes:
-                out_series = pd.Series()
-                out_series.iloc[0:3] = dseries.iloc[0:3]
-                out_series["Gene_start"] = gene.start
-                out_series["Gene_end"] = gene.end
-                out_series["Gene_orientation"] = gene.strand
+                # tmp_df = pd.Series()
+                tmp_df["Gene_start"] = gene.start
+                tmp_df["Gene_end"] = gene.end
+                tmp_df["Gene_orientation"] = gene.strand
                 if gene.strand == '+':
-                    out_series["Relative_Distance"] = dseries["SNP_pos"] - gene.start
+                    tmp_df["Relative_Distance"] = dseries["SNP_pos"] - gene.start
                 else:
-                    out_series["Relative_Distance"] = gene.start - dseries["SNP_pos"]
+                    tmp_df["Relative_Distance"] = gene.start - dseries["SNP_pos"]
                 if gene.start <= dseries["SNP_pos"] <= gene.end:
                     relpos = "in gene"
                 elif dseries["SNP_pos"] < gene.start:
@@ -156,40 +163,40 @@ class GeneAnnotationDbExtractor:
                         relpos = "downstream"
                     else:
                         relpos = "upstream"
-                out_series["SNP_relative_position"] = relpos
-                out_series["target_AGI"] = gene.id
-                out_series["target_element_type"] = gene.feature
-                out_series["target_sequence_type"] = gene.sequencetype
-                out_series["target_attributes"] = gene.attribute
-                output_df.add_dataset(out_series)
+                tmp_df["SNP_relative_position"] = relpos
+                tmp_df["target_AGI"] = gene.id
+                tmp_df["target_element_type"] = gene.feature
+                tmp_df["target_sequence_type"] = gene.sequencetype
+                tmp_df["target_attributes"] = gene.attribute
+                output_df.add_dataset(tmp_df)
 
                 if infodepth > 0:
-                    rna = gene.rna
-                    out_series["Gene_start"] = rna.start
-                    out_series["Gene_end"] = rna.end
-                    out_series["Gene_orientation"] = rna.strand
-                    if rna.strand == '+':
-                        out_series["Relative_Distance"] = dseries["SNP_pos"] - rna.start
-                    else:
-                        out_series["Relative_Distance"] = rna.start - dseries["SNP_pos"]
-                    if rna.start <= dseries["SNP_pos"] <= rna.end:
-                        relpos = "in gene"
-                    elif dseries["SNP_pos"] < rna.start:
+                    for rna in gene.rna:
+                        tmp_df["Gene_start"] = rna.start
+                        tmp_df["Gene_end"] = rna.end
+                        tmp_df["Gene_orientation"] = rna.strand
                         if rna.strand == '+':
-                            relpos = "upstream"
+                            tmp_df["Relative_Distance"] = dseries["SNP_pos"] - rna.start
                         else:
-                            relpos = "downstream"
-                    else:
-                        if rna.strand == '+':
-                            relpos = "downstream"
+                            tmp_df["Relative_Distance"] = rna.start - dseries["SNP_pos"]
+                        if rna.start <= dseries["SNP_pos"] <= rna.end:
+                            relpos = "in gene"
+                        elif dseries["SNP_pos"] < rna.start:
+                            if rna.strand == '+':
+                                relpos = "upstream"
+                            else:
+                                relpos = "downstream"
                         else:
-                            relpos = "upstream"
-                    out_series["SNP_relative_position"] = relpos
-                    out_series["target_AGI"] = rna.id
-                    out_series["target_element_type"] = rna.feature
-                    out_series["target_sequence_type"] = rna.sequencetype
-                    out_series["target_attributes"] = rna.attribute
-                    output_df.add_dataset(out_series)
+                            if rna.strand == '+':
+                                relpos = "downstream"
+                            else:
+                                relpos = "upstream"
+                        tmp_df["SNP_relative_position"] = relpos
+                        tmp_df["target_AGI"] = rna.id
+                        tmp_df["target_element_type"] = rna.feature
+                        tmp_df["target_sequence_type"] = rna.sequencetype
+                        tmp_df["target_attributes"] = rna.attribute
+                        output_df.add_dataset(tmp_df)
                 # ostream.write(str(gene.seqname) + "\t")
                 # ostream.write(str(gene.start) + "\t")
                 # ostream.write(str(gene.end) + "\t")
@@ -204,6 +211,9 @@ class GeneAnnotationDbExtractor:
 
     def extract_loc_uddist(self, echr, eloc, udist, ddist):
         genes = []
+        eloc = int(eloc)  # conversion from numpy.int because database uses native type atm
+        udist = int(udist)
+        ddist = int(ddist)
         try:
             int(echr)
             chr_int_search = True
