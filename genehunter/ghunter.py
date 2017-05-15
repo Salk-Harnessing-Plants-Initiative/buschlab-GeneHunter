@@ -242,8 +242,8 @@ class GeneAnnotator(object):
                 if gw_pval <= used_threshold and gw_mac >= args.minor_allele_count:
                     passed_cnt += 1
                     dbextract.flush()
-                    dbextract.extract_loc_uddist(gw_chr, gw_pos, args.udistance, args.ddistance)
-                    genes = dbextract.get_genes()
+                    genes = dbextract.extract_loc_uddist(gw_chr, gw_pos, args.udistance, args.ddistance)
+                    # genes = dbextract.get_genes()
                     sys.stdout.write("peak: chr{}, pos {} -> {} genes in range\n".format(gw_chr, gw_pos, len(genes)))
 
                     if len(genes) == 0:
@@ -284,9 +284,9 @@ class GeneAnnotator(object):
                         ostream.write("%d\t" % gene.end)
                         ostream.write("%s\t" % gene.strand)
                         if gene.strand == '+':
-                            ostream.write("%d\t" % abs(gene.start - gw_pos))
+                            ostream.write("%d\t" % (gene.start - gw_pos))
                         else:
-                            ostream.write("%d\t" % abs(gene.end - gw_pos))
+                            ostream.write("%d\t" % (gw_pos - gene.start))
 
                         if gene.start <= gw_pos <= gene.end:
                             relpos = "in gene"
@@ -324,9 +324,9 @@ class GeneAnnotator(object):
                                 ostream.write("%d\t" % rna.end)
                                 ostream.write("%s\t" % rna.strand)
                                 if rna.strand == '+':
-                                    ostream.write("%d\t" % abs(rna.start - gw_pos))
+                                    ostream.write("%d\t" % (rna.start - gw_pos))
                                 else:
-                                    ostream.write("%d\t" % abs(rna.end - gw_pos))
+                                    ostream.write("%d\t" % (gw_pos - rna.end))
 
                                 if rna.start <= gw_pos <= rna.end:
                                     relpos = "in gene"
