@@ -31,7 +31,7 @@ class GeneAnnotator(object):
 
     @staticmethod
     def create_db(args):
-        if os.path.exists(args.output):
+        if os.path.exists(args.output) and not args.add:
             raise Exception("database file '%s' exists!\nChoose another output file. Terminating!\n" % args.output)
         if args.gff is not None and not os.path.exists(args.gff):
             raise Exception("cannot open GFF file '%s'! Terminating!\n" % args.gff)
@@ -366,6 +366,7 @@ class GeneAnnotator(object):
         createparser.add_argument('--desc', help='path to functional descriptions file')
         createparser.add_argument('--aliases', help='path to gene aliases file')
         createparser.add_argument('--sorf', help='path to sORF file')
+        createparser.add_argument('--add', type=bool, default=False, help='add entries to existing database')
         createparser.add_argument('-o', '--output', required=True, help='path to output file')
         createparser.set_defaults(func=self.create_db)
 
@@ -401,7 +402,7 @@ class GeneAnnotator(object):
         hunterparser.add_argument('--name', default="*.pvals",
                                   help='name identifier for the pval files. Unix like globs are allow (e.g. "name*")')
         hunterparser.add_argument('--depth', type=int, default=1,
-                                    help='defines what to print. 0=genes only, 1=genes and rna, 2=all features')
+                                  help='defines what to print. 0=genes only, 1=genes and rna, 2=all features')
         hunterparser.add_argument('-u', '--udistance', type=int, default=4000,
                                   help='maximal upstream distance from TSS (default=4000)')
         hunterparser.add_argument('-d', '--ddistance', type=int, default=4000,

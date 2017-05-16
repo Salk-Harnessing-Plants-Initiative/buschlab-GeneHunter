@@ -46,11 +46,11 @@ class GeneAnnotationDbCreator(object):
 
                 cols = line.split('\t')
                 if len(cols) < 9:
-                    break
+                    continue
                 attrs = self._extract_attributes(cols[8])
                 # if cols[2] == 'chromosome':
                 #     continue # ignore 'chromosome' entries found in TAIR10
-                if cols[2].lower() == 'gene':
+                if cols[2].lower() == 'gene' or cols[2].lower == 'transposable_element':
                     gene_start = int(cols[3])
                     gene_end = int(cols[4])
                     # short_annotation=self._extract_short_annotation(cols[8])
@@ -70,7 +70,7 @@ class GeneAnnotationDbCreator(object):
 
                         cols = line.split('\t')
                         if len(cols) < 9:
-                            break
+                            continue
                         feature_start = int(cols[3])
                         feature_end = int(cols[4])
                         attrs = self._extract_attributes(cols[8])
@@ -85,7 +85,7 @@ class GeneAnnotationDbCreator(object):
 
                         if 'chromosome' in cols[2].lower():
                             continue
-                        if 'gene' in cols[2].lower():
+                        if cols[2].lower() == 'gene' or cols[2].lower():
                             break
                         if 'rna' in cols[2].lower():
                             rna = RNA(seqname=cols[0], source=cols[1], feature=cols[2], start=feature_start,

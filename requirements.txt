@@ -1,3 +1,5 @@
+statsmodels
+pandas
 sqlalchemy
 #numpy>=1.8.2
 #scipy>=0.16.0
