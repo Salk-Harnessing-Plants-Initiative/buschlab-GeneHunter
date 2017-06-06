@@ -366,7 +366,7 @@ class GeneAnnotator(object):
         createparser.add_argument('--desc', help='path to functional descriptions file')
         createparser.add_argument('--aliases', help='path to gene aliases file')
         createparser.add_argument('--sorf', help='path to sORF file')
-        createparser.add_argument('--add', type=bool, default=False, help='add entries to existing database')
+        createparser.add_argument('-a', '--add', action="store_true", help='add entries to existing database')
         createparser.add_argument('-o', '--output', required=True, help='path to output file')
         createparser.set_defaults(func=self.create_db)
 
