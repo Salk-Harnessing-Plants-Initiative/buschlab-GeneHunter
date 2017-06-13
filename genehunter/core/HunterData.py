@@ -1,7 +1,42 @@
 from collections import OrderedDict
 
+import h5py as h5
 import pandas as pd
 import numpy as np
+
+
+class GwasData(object):
+    def __init__(self):
+        self.df = None;
+
+    def read_hdf5(self, filepath, pval_threshold=1.0, mac_threshold=0):
+        self.df = None
+
+        with h5.File(filepath, "r") as h5file:
+            root = h5file["pvalues"]
+
+            groupnames = root.keys()
+            for gname in groupnames:
+                tmpdf = pd.DataFrame()
+                grp = root[gname]
+                mth = grp["macs"][...] >= mac_threshold
+                pth = grp["scores"][...] >= -np.log10(pval_threshold)
+
+                combinedth = mth & pth
+
+                tmpdf["positions"] = grp["positions"][combinedth]
+                tmpdf["pvalues"] = grp["scores"][combinedth]
+                tmpdf["macs"] = grp["macs"][combinedth]
+                tmpdf.insert(0, "chromosomes", np.repeat(int(gname.strip("chr")), tmpdf.shape[0]))
+
+                if self.df is not None:
+                    pd.concat([self.df, tmpdf], ignore_index=True)
+                else:
+                    self.df = tmpdf
+        pass
+
+
+
 
 class InputData(object):
     def __init__(self, fdr=0.05):
@@ -53,3 +88,8 @@ class OutputData(object):
     def write_csv(self, filepath):
         self.df = self.df.reindex_axis(self.col_types.keys(), axis=1)
         self.df.to_csv(filepath, index=False, na_rep="NA")
+
+
+if __name__ == '__main__':
+    gwd = GwasData()
+    gwd.read_hdf5("/net/gmi.oeaw.ac.at/busch/lab/Marco/GWAS/Medicago/20170606_Mt_StantonGeddes2013_gwas-results/20170606_Mt_StantonGeddes2013_height3.hdf5", pval_threshold=1.0e-5, mac_threshold=0)
