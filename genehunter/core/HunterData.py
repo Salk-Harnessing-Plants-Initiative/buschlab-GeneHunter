@@ -1,5 +1,8 @@
 from collections import OrderedDict
 
+import os
+import sys
+import time
 import h5py as h5
 import pandas as pd
 import numpy as np
@@ -7,34 +10,68 @@ import numpy as np
 
 class GwasData(object):
     def __init__(self):
-        self.df = None;
+        self._data = None
+
+    @property
+    def data(self):
+        return self._data
+
+    # @data.setter
+    # def data(self, df):
+    #     self._data = df
 
     def read_hdf5(self, filepath, pval_threshold=1.0, mac_threshold=0):
-        self.df = None
-
+        sys.stdout.write("Reading file: {} ... ".format(os.path.basename(filepath)))
+        sys.stdout.flush()
+        score_threshold = -np.log10(pval_threshold)
         with h5.File(filepath, "r") as h5file:
+            start = time.time()
             root = h5file["pvalues"]
 
+            all_pvalues = []
             groupnames = root.keys()
             for gname in groupnames:
-                tmpdf = pd.DataFrame()
                 grp = root[gname]
-                mth = grp["macs"][...] >= mac_threshold
-                pth = grp["scores"][...] >= -np.log10(pval_threshold)
 
+                raw_pvalues = np.power(10.0, -grp["scores"].value)
+                all_pvalues.append(raw_pvalues)
+                # if self._raw_pvalues is not None:
+                #     self._raw_pvalues.append(raw_pvalues)
+                # else:
+                #     self._raw_pvalues = raw_pvalues
+
+                mth = grp["macs"][...] >= mac_threshold
+                pth = grp["scores"][...] >= score_threshold
                 combinedth = mth & pth
 
-                tmpdf["positions"] = grp["positions"][combinedth]
-                tmpdf["pvalues"] = grp["scores"][combinedth]
-                tmpdf["macs"] = grp["macs"][combinedth]
-                tmpdf.insert(0, "chromosomes", np.repeat(int(gname.strip("chr")), tmpdf.shape[0]))
+                nrow = combinedth.sum()
+                if nrow > 0:
+                    # tmpdf = pd.DataFrame({
+                    #     "origin": np.repeat(os.path.basename(filepath), nrow),
+                    #     "chromosomes": np.repeat(int(gname.strip("chr")), nrow),
+                    #     "positions": grp["positions"][combinedth],
+                    #     "pvalues": raw_pvalues[combinedth],
+                    #     "macs": grp["macs"][combinedth]
+                    # })
+                    tmpdf = pd.DataFrame(columns=["origin", "chromosomes", "positions", "pvalues", "macs"])
+                                         #dtype={'origin': np.str, "chromosomes": np.int32, "positions": np.int64, "pvalues": np.float64, "macs": np.int32})
+                    tmpdf["origin"] = np.repeat(os.path.basename(filepath), nrow).astype(np.str)
+                    tmpdf["chromosomes"] = np.repeat(int(gname.strip("chr")), nrow).astype(np.int32)
+                    tmpdf["positions"] = grp["positions"][combinedth].astype(np.int64)
+                    # pvals = raw_pvalues[combinedth].tolist()
+                    tmpdf["pvalues"] = raw_pvalues[combinedth]
+                    tmpdf["macs"] = grp["macs"][combinedth].astype(np.int32)
 
-                if self.df is not None:
-                    pd.concat([self.df, tmpdf], ignore_index=True)
-                else:
-                    self.df = tmpdf
-        pass
+                    if self._data is not None:
+                        self._data = pd.concat([self._data, tmpdf], ignore_index=True, axis=0)
+                    else:
+                        self._data = tmpdf
+        sys.stdout.write("[ {:f}s ]\n".format(time.time() - start))
+        sys.stdout.write("calculating thresholds ... ")
+        sys.stdout.flush()
 
+
+        print(self._data)
 
 
 
@@ -92,4 +129,5 @@ class OutputData(object):
 
 if __name__ == '__main__':
     gwd = GwasData()
-    gwd.read_hdf5("/net/gmi.oeaw.ac.at/busch/lab/Marco/GWAS/Medicago/20170606_Mt_StantonGeddes2013_gwas-results/20170606_Mt_StantonGeddes2013_height3.hdf5", pval_threshold=1.0e-5, mac_threshold=0)
+    gwd.read_hdf5("/net/gmi.oeaw.ac.at/busch/lab/Marco/GWAS/Medicago/20170606_Mt_StantonGeddes2013_gwas-results/20170606_Mt_StantonGeddes2013_height3.hdf5", pval_threshold=1.0e-6, mac_threshold=10)
+    gwd.read_hdf5("/net/gmi.oeaw.ac.at/busch/lab/Marco/GWAS/Medicago/20170606_Mt_StantonGeddes2013_gwas-results/20170606_Mt_StantonGeddes2013_totNod.hdf5", pval_threshold=1.0e-6, mac_threshold=10)
