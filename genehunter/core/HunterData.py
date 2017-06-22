@@ -3,9 +3,12 @@ from collections import OrderedDict
 import os
 import sys
 import time
+from statsmodels.sandbox.stats.multicomp import fdrcorrection0
 import h5py as h5
 import pandas as pd
 import numpy as np
+
+from genehunter.core.mtcorr import get_bh_thres
 
 
 class GwasData(object):
@@ -20,7 +23,7 @@ class GwasData(object):
     # def data(self, df):
     #     self._data = df
 
-    def read_hdf5(self, filepath, pval_threshold=1.0, mac_threshold=0):
+    def read_hdf5(self, filepath, pval_threshold=1.0, mac_threshold=0, fdr_alpha=0.05):
         sys.stdout.write("Reading file: {} ... ".format(os.path.basename(filepath)))
         sys.stdout.flush()
         score_threshold = -np.log10(pval_threshold)
@@ -34,7 +37,7 @@ class GwasData(object):
                 grp = root[gname]
 
                 raw_pvalues = np.power(10.0, -grp["scores"].value)
-                all_pvalues.append(raw_pvalues)
+                all_pvalues.extend(raw_pvalues)
                 # if self._raw_pvalues is not None:
                 #     self._raw_pvalues.append(raw_pvalues)
                 # else:
@@ -67,8 +70,13 @@ class GwasData(object):
                     else:
                         self._data = tmpdf
         sys.stdout.write("[ {:f}s ]\n".format(time.time() - start))
-        sys.stdout.write("calculating thresholds ... ")
         sys.stdout.flush()
+        # sys.stdout.write("calculating thresholds ... ")
+        # bonferroni_th = fdr_alpha / len(all_pvalues)
+        # bh_rejected, bh_corrected = fdrcorrection0(all_pvalues, fdr_alpha, method="indep")
+        # bh_th = get_bh_thres(all_pvalues, fdr_alpha)
+        # # benjamini_yakutieli_th = fdrcorrection0(all_pvalues, fdr_alpha, method="fdr_by")
+        # sys.stdout.flush()
 
 
         print(self._data)
