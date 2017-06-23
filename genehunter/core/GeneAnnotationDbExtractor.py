@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import select
 # from sqlalchemy.orm.exc import *
 # from sqlalchemy import and_, or_
 from genehunter.core.HunterData import OutputData
@@ -30,10 +31,10 @@ class GeneAnnotationDbExtractor:
             sys.stderr.write("could not open database %s" % dbpath)
             return
 
-        conn = self.engine.connect()
-        conn.connection.create_function('regexp', 2, _re_fn)
+        self.conn = self.engine.connect()
+        self.conn.connection.create_function('regexp', 2, _re_fn)
         session = sessionmaker()
-        session.configure(bind=conn)  # (bind=self.engine)
+        session.configure(bind=self.conn)  # (bind=self.engine)
         self.session = session()
 
     def flush(self):

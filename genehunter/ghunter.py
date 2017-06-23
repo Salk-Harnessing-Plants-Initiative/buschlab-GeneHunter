@@ -13,7 +13,7 @@ import statsmodels.sandbox.stats.multicomp as sm
 import genehunter.core.mtcorr as mt
 from genehunter.core.GeneAnnotationDbCreator import GeneAnnotationDbCreator
 from genehunter.core.GeneAnnotationDbExtractor import GeneAnnotationDbExtractor
-from genehunter.core.HunterData import InputData
+from genehunter.core.HunterData import InputData, GwasData
 
 __version__ = "0.1.1"
 
@@ -140,6 +140,20 @@ class GeneAnnotator(object):
 
     @staticmethod
     def extract_hunter(args):
+        dbextract = GeneAnnotationDbExtractor(args.db)
+        sys.stdout.write("gene hunter using database: {}".format(args.db))
+
+        all_peaks_df = None
+        for gwasfilename in glob.glob(os.path.join(args.dir, args.name)):
+            assert gwasfilename.endswith(".hdf5") #TODO: create stable test
+            gwd = GwasData()
+            gwd.read_hdf5(gwasfilename, pval_threshold=args.pvalue_threshold, mac_threshold=args.minor_allele_count, fdr_alpha=args.fdr)
+            peaks_df = gwd.data
+
+            # genes_df
+
+    @staticmethod
+    def extract_hunter_deprecated(args):
         dbextract = GeneAnnotationDbExtractor(args.db)
         dbid = dbextract.get_database_id()
 
@@ -407,9 +421,9 @@ class GeneAnnotator(object):
                                   help='maximal upstream distance from TSS (default=4000)')
         hunterparser.add_argument('-d', '--ddistance', type=int, default=4000,
                                   help='maximal downstream distance from TSS (default=4000)')
-        hunterparser.add_argument('-P', '--pvalue_threshold', default='1.0e-6',
-                                  help='SNP p-value threshold (default=1.0e-6). If the given argument is \"bonf\", \
-                                  \"bh\" or \"bhy\", only values below the calculated threshold are included.')
+        hunterparser.add_argument('-P', '--pvalue_threshold', default='1.0e-6', type=float,
+                                  help='SNP p-value threshold (default=1.0e-6).') # If the given argument is \"bonf\", \
+                                  # \"bh\" or \"bhy\", only values below the calculated threshold are included.')
         hunterparser.add_argument('-M', '--minor_allele_count', type=int, default=10,
                                   help='minor allele count threshold (default=10)')
         hunterparser.add_argument('-o', '--output', help='path to output file. Will print to stdout if omitted.')
@@ -426,4 +440,8 @@ class GeneAnnotator(object):
 
 
 if __name__ == '__main__':
-    main()
+    extractor = GeneAnnotationDbExtractor("/home/GMI/christian.goeschl/devel/pycharm/GeneHunter/db/Mt4.0v2_20140818_1100.sqlite")
+    extractor.extract_test()
+
+# if __name__ == '__main__':
+#     main()

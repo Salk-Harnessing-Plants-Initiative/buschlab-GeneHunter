@@ -24,6 +24,7 @@ class GwasData(object):
     #     self._data = df
 
     def read_hdf5(self, filepath, pval_threshold=1.0, mac_threshold=0, fdr_alpha=0.05):
+        file_df = None
         sys.stdout.write("Reading file: {} ... ".format(os.path.basename(filepath)))
         sys.stdout.flush()
         score_threshold = -np.log10(pval_threshold)
@@ -32,6 +33,7 @@ class GwasData(object):
             root = h5file["pvalues"]
 
             all_pvalues = []
+            all_selected = []
             groupnames = root.keys()
             for gname in groupnames:
                 grp = root[gname]
@@ -46,6 +48,7 @@ class GwasData(object):
                 mth = grp["macs"][...] >= mac_threshold
                 pth = grp["scores"][...] >= score_threshold
                 combinedth = mth & pth
+                all_selected.extend(combinedth)
 
                 nrow = combinedth.sum()
                 if nrow > 0:
@@ -65,21 +68,35 @@ class GwasData(object):
                     tmpdf["pvalues"] = raw_pvalues[combinedth]
                     tmpdf["macs"] = grp["macs"][combinedth].astype(np.int32)
 
-                    if self._data is not None:
-                        self._data = pd.concat([self._data, tmpdf], ignore_index=True, axis=0)
+                    if file_df is not None:
+                        file_df = pd.concat([file_df, tmpdf], ignore_index=True, axis=0)
                     else:
-                        self._data = tmpdf
+                        file_df = tmpdf
         sys.stdout.write("[ {:f}s ]\n".format(time.time() - start))
-        sys.stdout.flush()
-        # sys.stdout.write("calculating thresholds ... ")
-        # bonferroni_th = fdr_alpha / len(all_pvalues)
-        # bh_rejected, bh_corrected = fdrcorrection0(all_pvalues, fdr_alpha, method="indep")
-        # bh_th = get_bh_thres(all_pvalues, fdr_alpha)
+
+        if file_df is not None:
+            sys.stdout.write("{:d} positions passed.\n".format(file_df.shape[0]))
+            sys.stdout.write("calculating thresholds ... ")
+            sys.stdout.flush()
+            start = time.time()
+            bonferroni_th = fdr_alpha / len(all_pvalues)
+            bh_rejected, bh_corrected = fdrcorrection0(all_pvalues, fdr_alpha, method="indep")
+            bh_th = get_bh_thres(all_pvalues, fdr_alpha)
+            file_df["bonf_thres"] = np.repeat(bonferroni_th, file_df.shape[0])
+            file_df["bh_thres"] = np.repeat(bh_th["thes_pval"], file_df.shape[0])
+            file_df["bh_corrected"] = np.array(bh_corrected)[all_selected]
+            file_df["bh_rejected"] = np.array(bh_rejected)[all_selected]
+            sys.stdout.write("[ {:f}s ]\n\n".format(time.time() - start))
+
+        if self._data is not None:
+            pd.concat([self._data, file_df], ignore_index=True, axis=0)
+        else:
+            self._data = file_df
         # # benjamini_yakutieli_th = fdrcorrection0(all_pvalues, fdr_alpha, method="fdr_by")
         # sys.stdout.flush()
 
 
-        print(self._data)
+        # print(self._data)
 
 
 
