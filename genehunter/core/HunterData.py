@@ -92,12 +92,21 @@ class GwasData(object):
             pd.concat([self._data, file_df], ignore_index=True, axis=0)
         else:
             self._data = file_df
-        # # benjamini_yakutieli_th = fdrcorrection0(all_pvalues, fdr_alpha, method="fdr_by")
-        # sys.stdout.flush()
 
+    @staticmethod
+    def remap_hdf5_results(h5filepath, mapfilepath):
+        chrom_mapping = dict()
+        with open(mapfilepath, "r") as mapfile:
+            for line in mapfile:
+                cols = line.split(',')
+                chrom_mapping[int(cols[0])] = cols[1]
 
-        # print(self._data)
+        with h5.File(h5filepath, "a") as h5file:
+            pval_grp = h5file["pvalues"]
 
+            for key in pval_grp.keys():
+                intkey = int(key.strip(chr))
+                real_name = chrom_mapping[intkey]
 
 
 class InputData(object):

@@ -148,9 +148,80 @@ class GeneAnnotator(object):
             assert gwasfilename.endswith(".hdf5") #TODO: create stable test
             gwd = GwasData()
             gwd.read_hdf5(gwasfilename, pval_threshold=args.pvalue_threshold, mac_threshold=args.minor_allele_count, fdr_alpha=args.fdr)
-            peaks_df = gwd.data
+            # peaks_df = gwd.data
 
-            # genes_df
+            # genes_df = none
+            for ix, row in gwd.data.iterrows():
+                gw_chr = str(row["chromosomes"])
+                gw_pos = row["positions"]
+                genes = dbextract.extract_loc_uddist(gw_chr, gw_pos, args.udistance, args.ddistance)
+                sys.stdout.write("peak: chr{}, pos {} -> {} genes in range\n".format(gw_chr, gw_pos, len(genes)))
+                for g in genes:
+                    ext_row = pd.Series(row)
+                    ext_row["Gene_start"] = g.start
+                    ext_row["Gene_end"] = g.end
+                    ext_row["Gene_orientation"] = g.strand
+                    if g.strand == '+':
+                        ext_row["Relative_distance"] = g.start - gw_pos
+                    else:
+                        ext_row["Relative_distance"] = gw_pos - g.start
+
+                    if g.start <= gw_pos <= g.end:
+                        ext_row["relpos"] = "in gene"
+                    elif gw_pos < g.start:
+                        if g.strand == '+':
+                            ext_row["relpos"] = "upstream"
+                        else:
+                            ext_row["relpos"] = "downstream"
+                    else:
+                        if g.strand == '+':
+                            ext_row["relpos"] = "downstream"
+                        else:
+                            ext_row["relpos"] = "upstream"
+                    ext_row["Target_AGI"] = g.id
+                    ext_row["Target_element_type"] = g.feature
+                    ext_row["Target_sequence_type"] = g.sequencetype
+                    ext_row["Target_attributes"] = g.attribute
+
+                    if all_peaks_df is not None:
+                        all_peaks_df = pd.concat([all_peaks_df, ext_row.to_frame().transpose()], axis=0, ignore_index=True)
+                    else:
+                        all_peaks_df = ext_row.to_frame().transpose()
+
+                    if args.depth >= 1:
+                        for rna in g.rna:
+                            ext_row = pd.Series(row)
+                            ext_row["Gene_start"] = g.start
+                            ext_row["Gene_end"] = g.end
+                            ext_row["Gene_orientation"] = g.strand
+                            if g.strand == '+':
+                                ext_row["Relative_distance"] = g.start - gw_pos
+                            else:
+                                ext_row["Relative_distance"] = gw_pos - g.start
+
+                            if g.start <= gw_pos <= g.end:
+                                ext_row["relpos"] = "in gene"
+                            elif gw_pos < g.start:
+                                if g.strand == '+':
+                                    ext_row["relpos"] = "upstream"
+                                else:
+                                    ext_row["relpos"] = "downstream"
+                            else:
+                                if g.strand == '+':
+                                    ext_row["relpos"] = "downstream"
+                                else:
+                                    ext_row["relpos"] = "upstream"
+                            ext_row["Target_AGI"] = g.id
+                            ext_row["Target_element_type"] = g.feature
+                            ext_row["Target_sequence_type"] = g.sequencetype
+                            ext_row["Target_attributes"] = g.attribute
+
+                            all_peaks_df = pd.concat([all_peaks_df, ext_row.to_frame().transpose()], axis=0, ignore_index=True)
+
+        if args.output is not None:
+            all_peaks_df.to_csv(args.output, sep=',', header=True, index=False)
+        else:
+            all_peaks_df.to_string(sys.stdout, header=True, index=False)
 
     @staticmethod
     def extract_hunter_deprecated(args):
@@ -366,7 +437,9 @@ class GeneAnnotator(object):
         if isfile:
             ostream.close()
 
-
+    @staticmethod
+    def remap_hdf5_results(args):
+        GwasData.remap_hdf5_results(args.h5file, args.mapfile)
 
     def parse_arguments(self):
         mainparser = argparse.ArgumentParser(description='tair database suite',
@@ -431,6 +504,11 @@ class GeneAnnotator(object):
                                   help="alpha for fdr threshold calculation")
         hunterparser.set_defaults(func=self.extract_hunter)
 
+        remapparser = subparsers.add_parser('remap_chrs', help='remap integer chromosome names to real names')
+        remapparser.add_argument('-m', '--mapfile', required=True, help='comma separated txt file containing the mapping')
+        remapparser.add_argument('-f', '--h5file', required=True, help='hdf5 file to be changed')
+        remapparser.set_defaults(func=self.remap_hdf5_results)
+
         statusparser = subparsers.add_parser('stats', help='get some statistics about database')
         statusparser.add_argument('--db', required=True, help='path to gene annotation database')
         statusparser.set_defaults(func=self.print_stats)
@@ -439,9 +517,9 @@ class GeneAnnotator(object):
         args.func(args)
 
 
-if __name__ == '__main__':
-    extractor = GeneAnnotationDbExtractor("/home/GMI/christian.goeschl/devel/pycharm/GeneHunter/db/Mt4.0v2_20140818_1100.sqlite")
-    extractor.extract_test()
-
 # if __name__ == '__main__':
-#     main()
+#     extractor = GeneAnnotationDbExtractor("/home/GMI/christian.goeschl/devel/pycharm/GeneHunter/db/Mt4.0v2_20140818_1100.sqlite")
+#     extractor.extract_test()
+
+if __name__ == '__main__':
+    main()
