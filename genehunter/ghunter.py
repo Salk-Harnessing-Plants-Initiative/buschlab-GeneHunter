@@ -152,19 +152,37 @@ class GeneAnnotator(object):
 
             # genes_df = none
             for ix, row in gwd.data.iterrows():
-                gw_chr = str(row["chromosomes"])
+                gw_chr = str(row["chromosomes"]).strip()
                 gw_pos = row["positions"]
                 genes = dbextract.extract_loc_uddist(gw_chr, gw_pos, args.udistance, args.ddistance)
-                sys.stdout.write("peak: chr{}, pos {} -> {} genes in range\n".format(gw_chr, gw_pos, len(genes)))
+                sys.stdout.write("    peak: {}, pos {} -> {} genes in range\n".format(gw_chr, gw_pos, len(genes)))
+                if len(genes) == 0:
+                    ext_row = pd.Series(row)
+                    ext_row["Gene_start"] = "NA"
+                    ext_row["Gene_end"] = "NA"
+                    ext_row["Gene_orientation"] = "NA"
+                    ext_row["Relative_distance"] = "NA"
+                    ext_row["relpos"] = "NA"
+                    ext_row["Target_AGI"] = "NA"
+                    ext_row["Target_element_type"] = "NA"
+                    ext_row["Target_sequence_type"] = "NA"
+                    ext_row["Target_attributes"] = "NA"
+
+                    if all_peaks_df is not None:
+                        all_peaks_df = pd.concat([all_peaks_df, ext_row.to_frame().transpose()], axis=0, ignore_index=True)
+                    else:
+                        all_peaks_df = ext_row.to_frame().transpose()
+                    continue
+
                 for g in genes:
                     ext_row = pd.Series(row)
                     ext_row["Gene_start"] = g.start
                     ext_row["Gene_end"] = g.end
                     ext_row["Gene_orientation"] = g.strand
                     if g.strand == '+':
-                        ext_row["Relative_distance"] = g.start - gw_pos
-                    else:
                         ext_row["Relative_distance"] = gw_pos - g.start
+                    else:
+                        ext_row["Relative_distance"] = g.start - gw_pos
 
                     if g.start <= gw_pos <= g.end:
                         ext_row["relpos"] = "in gene"
@@ -191,35 +209,40 @@ class GeneAnnotator(object):
                     if args.depth >= 1:
                         for rna in g.rna:
                             ext_row = pd.Series(row)
-                            ext_row["Gene_start"] = g.start
-                            ext_row["Gene_end"] = g.end
-                            ext_row["Gene_orientation"] = g.strand
-                            if g.strand == '+':
-                                ext_row["Relative_distance"] = g.start - gw_pos
+                            ext_row["Gene_start"] = rna.start
+                            ext_row["Gene_end"] = rna.end
+                            ext_row["Gene_orientation"] = rna.strand
+                            if rna.strand == '+':
+                                ext_row["Relative_distance"] = gw_pos - rna.start
                             else:
-                                ext_row["Relative_distance"] = gw_pos - g.start
+                                ext_row["Relative_distance"] = rna.start - gw_pos
 
-                            if g.start <= gw_pos <= g.end:
-                                ext_row["relpos"] = "in gene"
-                            elif gw_pos < g.start:
-                                if g.strand == '+':
+                            if rna.start <= gw_pos <= rna.end:
+                                ext_row["relpos"] = "in feature"
+                            elif gw_pos < rna.start:
+                                if rna.strand == '+':
                                     ext_row["relpos"] = "upstream"
                                 else:
                                     ext_row["relpos"] = "downstream"
                             else:
-                                if g.strand == '+':
+                                if rna.strand == '+':
                                     ext_row["relpos"] = "downstream"
                                 else:
                                     ext_row["relpos"] = "upstream"
-                            ext_row["Target_AGI"] = g.id
-                            ext_row["Target_element_type"] = g.feature
-                            ext_row["Target_sequence_type"] = g.sequencetype
-                            ext_row["Target_attributes"] = g.attribute
+                            ext_row["Target_AGI"] = rna.id
+                            ext_row["Target_element_type"] = rna.feature
+                            ext_row["Target_sequence_type"] = rna.sequencetype
+                            ext_row["Target_attributes"] = rna.attribute
 
                             all_peaks_df = pd.concat([all_peaks_df, ext_row.to_frame().transpose()], axis=0, ignore_index=True)
-
-        if args.output is not None:
-            all_peaks_df.to_csv(args.output, sep=',', header=True, index=False)
+            sys.stdout.write("\n")
+        if args.output:
+            out_path = "gene-hunter_u{:d}_d{:d}_pval{:.3e}_mac{:d}_fdr{:.3f}.csv".format(args.udistance, args.ddistance,
+                                                                                         args.pvalue_threshold,
+                                                                                         args.minor_allele_count,
+                                                                                         args.fdr)
+            out_path = os.path.join(args.dir, out_path)
+            all_peaks_df.to_csv(out_path, sep=',', header=True, index=False)
         else:
             all_peaks_df.to_string(sys.stdout, header=True, index=False)
 
@@ -439,7 +462,8 @@ class GeneAnnotator(object):
 
     @staticmethod
     def remap_hdf5_results(args):
-        GwasData.remap_hdf5_results(args.h5file, args.mapfile)
+        for h5filepath in glob.glob(os.path.join(args.dir, args.name)):
+            GwasData.remap_hdf5_results(h5filepath, args.mapfile)
 
     def parse_arguments(self):
         mainparser = argparse.ArgumentParser(description='tair database suite',
@@ -499,14 +523,15 @@ class GeneAnnotator(object):
                                   # \"bh\" or \"bhy\", only values below the calculated threshold are included.')
         hunterparser.add_argument('-M', '--minor_allele_count', type=int, default=10,
                                   help='minor allele count threshold (default=10)')
-        hunterparser.add_argument('-o', '--output', help='path to output file. Will print to stdout if omitted.')
+        hunterparser.add_argument('-o', '--output', action="store_true", help='Output to file. Will print to stdout if omitted.')
         hunterparser.add_argument('-f', '--fdr', type=float, default=0.05,
                                   help="alpha for fdr threshold calculation")
         hunterparser.set_defaults(func=self.extract_hunter)
 
         remapparser = subparsers.add_parser('remap_chrs', help='remap integer chromosome names to real names')
+        remapparser.add_argument('-d', '--dir', required=True, help='directory where to look for pval files')
+        remapparser.add_argument('-n', '--name', default="*.hdf5", required=True, help='hdf5 file(s) to be changed')
         remapparser.add_argument('-m', '--mapfile', required=True, help='comma separated txt file containing the mapping')
-        remapparser.add_argument('-f', '--h5file', required=True, help='hdf5 file to be changed')
         remapparser.set_defaults(func=self.remap_hdf5_results)
 
         statusparser = subparsers.add_parser('stats', help='get some statistics about database')

@@ -57,12 +57,12 @@ class GeneAnnotationDbExtractor:
         ljmitoPattern = '^Ljmitog'
         ljset = []
         for id in allgenes:
-            if re.match(ljPattern,id[0]):
+            if re.match(ljPattern, id[0]):
                 ljcnt += 1
                 ljset.append(id[0])
                 if len(id[0]) != 13:
                     pass
-            elif re.match(ljchloroPattern,id[0]):
+            elif re.match(ljchloroPattern, id[0]):
                 ljchlorocnt += 1
             elif re.match(ljmitoPattern, id[0]):
                 ljmitocnt += 1
@@ -135,7 +135,8 @@ class GeneAnnotationDbExtractor:
         output_df = OutputData()
         for ix in inputdata.df.index:
             dseries = inputdata.df.loc[ix]
-            genes = self.extract_loc_uddist(dseries["Chromosome"], dseries["SNP_pos"], dseries["uDist"], dseries["dDist"])
+            genes = self.extract_loc_uddist(dseries["Chromosome"], dseries["SNP_pos"], dseries["uDist"],
+                                            dseries["dDist"])
             tmp_df = dseries.iloc[0:3]
 
             if len(genes) == 0:
@@ -198,16 +199,16 @@ class GeneAnnotationDbExtractor:
                         tmp_df["target_sequence_type"] = rna.sequencetype
                         tmp_df["target_attributes"] = rna.attribute
                         output_df.add_dataset(tmp_df)
-                # ostream.write(str(gene.seqname) + "\t")
-                # ostream.write(str(gene.start) + "\t")
-                # ostream.write(str(gene.end) + "\t")
-                # ostream.write(str(gene.strand) + "\t")
-                # ostream.write(str(gene.id) + "\t")
-                # ostream.write(str(gene.feature) + "\t")
-                # # ostream.write(str(gene.shortsym) + "\t")
-                # # ostream.write(str(gene.longsym) + "\t")
-                # ostream.write("\t")
-                # ostream.write(str(gene.attribute) + "\n")
+                        # ostream.write(str(gene.seqname) + "\t")
+                        # ostream.write(str(gene.start) + "\t")
+                        # ostream.write(str(gene.end) + "\t")
+                        # ostream.write(str(gene.strand) + "\t")
+                        # ostream.write(str(gene.id) + "\t")
+                        # ostream.write(str(gene.feature) + "\t")
+                        # # ostream.write(str(gene.shortsym) + "\t")
+                        # # ostream.write(str(gene.longsym) + "\t")
+                        # ostream.write("\t")
+                        # ostream.write(str(gene.attribute) + "\n")
         return output_df
 
     def extract_loc_uddist(self, echr, eloc, udist, ddist):
@@ -215,35 +216,35 @@ class GeneAnnotationDbExtractor:
         eloc = int(eloc)  # conversion from numpy.int because database uses native type atm
         udist = int(udist)
         ddist = int(ddist)
-        try:
-            int(echr)
-            chr_int_search = True
-        except ValueError:
-            chr_int_search = False
-
-        if chr_int_search:
-            regexstr = "[a-z_]{0,}" + echr
-            genes.extend(self.session.query(Gene).filter(Gene.seqname.op('regexp')(regexstr))
-                         .filter(Gene.strand == '+')
-                         .filter(Gene.start.between(eloc - udist, eloc + ddist) |
-                                 Gene.end.between(eloc - udist, eloc + ddist) |
-                                 ((Gene.start <= eloc) & (Gene.end >= eloc))))
-            genes.extend(self.session.query(Gene).filter(Gene.seqname.op('regexp')(regexstr))
-                              .filter(Gene.strand == '-')
-                              .filter(Gene.start.between(eloc - ddist, eloc + udist) |
-                                      Gene.end.between(eloc - ddist, eloc + udist) |
-                                      ((Gene.start <= eloc) & (Gene.end >= eloc))))
-        else:
-            genes.extend(self.session.query(Gene).filter(Gene.seqname == echr)
-                              .filter(Gene.strand == '+')
-                              .filter(Gene.start.between(eloc-udist, eloc+ddist) |
-                                      Gene.end.between(eloc-udist, eloc+ddist) |
-                                      ((Gene.start <= eloc) & (Gene.end >= eloc))))
-            genes.extend(self.session.query(Gene).filter(Gene.seqname == echr)
-                              .filter(Gene.strand == '-')
-                              .filter(Gene.start.between(eloc - ddist, eloc + udist) |
-                                      Gene.end.between(eloc - ddist, eloc + udist) |
-                                      ((Gene.start <= eloc) & (Gene.end >= eloc))))
+        # try:
+        #     int(echr)
+        #     chr_int_search = True
+        # except ValueError:
+        #     chr_int_search = False
+        #
+        # if chr_int_search:
+        #     regexstr = "[a-z_]{0,}" + echr
+        #     genes.extend(self.session.query(Gene).filter(Gene.seqname.op('regexp')(regexstr))
+        #                  .filter(Gene.strand == '+')
+        #                  .filter(Gene.start.between(eloc - udist, eloc + ddist) |
+        #                          Gene.end.between(eloc - udist, eloc + ddist) |
+        #                          ((Gene.start <= eloc) & (Gene.end >= eloc))))
+        #     genes.extend(self.session.query(Gene).filter(Gene.seqname.op('regexp')(regexstr))
+        #                       .filter(Gene.strand == '-')
+        #                       .filter(Gene.start.between(eloc - ddist, eloc + udist) |
+        #                               Gene.end.between(eloc - ddist, eloc + udist) |
+        #                               ((Gene.start <= eloc) & (Gene.end >= eloc))))
+        # else:
+        genes.extend(self.session.query(Gene).filter(Gene.seqname == echr)
+                     .filter(Gene.strand == '+')
+                     .filter(Gene.start.between(eloc - udist, eloc + ddist) |
+                             Gene.end.between(eloc - udist, eloc + ddist) |
+                             ((Gene.start <= eloc) & (Gene.end >= eloc))))
+        genes.extend(self.session.query(Gene).filter(Gene.seqname == echr)
+                     .filter(Gene.strand == '-')
+                     .filter(Gene.start.between(eloc - ddist, eloc + udist) |
+                             Gene.end.between(eloc - ddist, eloc + udist) |
+                             ((Gene.start <= eloc) & (Gene.end >= eloc))))
 
         # self.genes.extend(self.session.query(TairGene)
         #                   .filter(TairGene.chromosome == echr)

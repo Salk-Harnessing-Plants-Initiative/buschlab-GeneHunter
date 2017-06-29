@@ -3,6 +3,7 @@ from collections import OrderedDict
 import os
 import sys
 import time
+import shutil
 from statsmodels.sandbox.stats.multicomp import fdrcorrection0
 import h5py as h5
 import pandas as pd
@@ -62,7 +63,8 @@ class GwasData(object):
                     tmpdf = pd.DataFrame(columns=["origin", "chromosomes", "positions", "pvalues", "macs"])
                                          #dtype={'origin': np.str, "chromosomes": np.int32, "positions": np.int64, "pvalues": np.float64, "macs": np.int32})
                     tmpdf["origin"] = np.repeat(os.path.basename(filepath), nrow).astype(np.str)
-                    tmpdf["chromosomes"] = np.repeat(int(gname.strip("chr")), nrow).astype(np.int32)
+                    # tmpdf["chromosomes"] = np.repeat(int(gname.strip("chr")), nrow).astype(np.int32)
+                    tmpdf["chromosomes"] = np.repeat(gname, nrow)
                     tmpdf["positions"] = grp["positions"][combinedth].astype(np.int64)
                     # pvals = raw_pvalues[combinedth].tolist()
                     tmpdf["pvalues"] = raw_pvalues[combinedth]
@@ -74,7 +76,7 @@ class GwasData(object):
                         file_df = tmpdf
         sys.stdout.write("[ {:f}s ]\n".format(time.time() - start))
 
-        if file_df is not None:
+        if file_df.shape[0] > 0:
             sys.stdout.write("{:d} positions passed.\n".format(file_df.shape[0]))
             sys.stdout.write("calculating thresholds ... ")
             sys.stdout.flush()
@@ -87,11 +89,13 @@ class GwasData(object):
             file_df["bh_corrected"] = np.array(bh_corrected)[all_selected]
             file_df["bh_rejected"] = np.array(bh_rejected)[all_selected]
             sys.stdout.write("[ {:f}s ]\n\n".format(time.time() - start))
-
-        if self._data is not None:
-            pd.concat([self._data, file_df], ignore_index=True, axis=0)
+            if self._data is not None:
+                pd.concat([self._data, file_df], ignore_index=True, axis=0)
+            else:
+                self._data = file_df
         else:
-            self._data = file_df
+            sys.stdout.write("no positions passed.")
+
 
     @staticmethod
     def remap_hdf5_results(h5filepath, mapfilepath):
@@ -99,14 +103,31 @@ class GwasData(object):
         with open(mapfilepath, "r") as mapfile:
             for line in mapfile:
                 cols = line.split(',')
-                chrom_mapping[int(cols[0])] = cols[1]
+                try:
+                    chrom_mapping[int(cols[0])] = cols[1].strip()
+                except ValueError:
+                    continue
 
         with h5.File(h5filepath, "a") as h5file:
             pval_grp = h5file["pvalues"]
 
+            backup_filepath = h5filepath + ".bak"
+            if not os.path.exists(backup_filepath):
+                shutil.copy2(h5filepath, backup_filepath)
+            else:
+                sys.stdout.write("Backup copy for file: {} exists. Skipping this file.\n".format(h5filepath))
+                return
+
+            current_keys = pval_grp.keys()
+            if len(set(chrom_mapping.values()) & set(current_keys)) == len(current_keys):
+                sys.stdout.write("Chromosomes seem to be already remapped in file: {}. Skipping this file.\n".format(h5filepath))
+                return
+
+            sys.stdout.write("Remapping chromosomes in file: {}.\n".format(h5filepath))
             for key in pval_grp.keys():
-                intkey = int(key.strip(chr))
+                intkey = int(key.strip('chr'))
                 real_name = chrom_mapping[intkey]
+                pval_grp.move(key, real_name)
 
 
 class InputData(object):
