@@ -25,7 +25,7 @@ class GeneAnnotationDbCreator(object):
 
     def create_gff_entries(self, gff_filepath):
         with open(gff_filepath, 'r') as gff_file:
-            total_lines_percent = float(sum(1 for _ in gff_file)) / 100.0
+            total_lines_percent = 100.0 / float(sum(1 for _ in gff_file))
             gff_file.seek(0)
             percent_done = 0.0
             prev_percent_done = 0.0
@@ -49,8 +49,9 @@ class GeneAnnotationDbCreator(object):
                     line = gff_file.readline()
                     continue
                 attrs = self._extract_attributes(cols[8])
-                # if cols[2] == 'chromosome':
-                #     continue # ignore 'chromosome' entries found in TAIR10
+                if cols[2] == 'chromosome':
+                    line = gff_file.readline()
+                    continue # ignore 'chromosome' entries found in TAIR10
                 if cols[2].lower() == 'gene' or cols[2].lower() == 'transposable_element':
                     gene_start = int(cols[3])
                     gene_end = int(cols[4])
@@ -59,7 +60,7 @@ class GeneAnnotationDbCreator(object):
                                 end=gene_end, score=cols[5], strand=cols[6], frame=cols[7],
                                 attribute=attrs.get('additional'), id=attrs.get('id'), sequencetype=attrs.get('sequencetype'))
                     self.session.add(gene)
-                    percent_done += 1.0 / total_lines_percent
+                    percent_done += total_lines_percent
                     if percent_done - prev_percent_done >= 1.0:
                         prev_percent_done = percent_done
                         sys.stdout.write("\r{:3.0f} % finished".format(percent_done))
@@ -104,7 +105,7 @@ class GeneAnnotationDbCreator(object):
                                               sequencetype=attrs.get('sequencetype'))
                             rna.features.append(feature)
 
-                        percent_done += 1 / total_lines_percent
+                        percent_done += total_lines_percent
                         if percent_done - prev_percent_done >= 1.0:
                             prev_percent_done = percent_done
                             sys.stdout.write("\r{:3.0f} % finished".format(percent_done))
