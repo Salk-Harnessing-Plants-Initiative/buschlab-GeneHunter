@@ -15,7 +15,7 @@ from genehunter.core.GeneAnnotationDbCreator import GeneAnnotationDbCreator
 from genehunter.core.GeneAnnotationDbExtractor import GeneAnnotationDbExtractor
 from genehunter.core.HunterData import InputData, GwasData
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 
 def main():
