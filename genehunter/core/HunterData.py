@@ -60,15 +60,15 @@ class GwasData(object):
                     #     "pvalues": raw_pvalues[combinedth],
                     #     "macs": grp["macs"][combinedth]
                     # })
-                    tmpdf = pd.DataFrame(columns=["origin", "chromosomes", "positions", "pvalues", "macs"])
+                    tmpdf = pd.DataFrame(columns=["Original_file", "Chromosome", "SNP_pos", "GWAS_pvalue", "MAC"])
                                          #dtype={'origin': np.str, "chromosomes": np.int32, "positions": np.int64, "pvalues": np.float64, "macs": np.int32})
-                    tmpdf["origin"] = np.repeat(os.path.basename(filepath), nrow).astype(np.str)
+                    tmpdf["Original_file"] = np.repeat(os.path.basename(filepath), nrow).astype(np.str)
                     # tmpdf["chromosomes"] = np.repeat(int(gname.strip("chr")), nrow).astype(np.int32)
-                    tmpdf["chromosomes"] = np.repeat(gname, nrow)
-                    tmpdf["positions"] = grp["positions"][combinedth].astype(np.int64)
+                    tmpdf["Chromosome"] = np.repeat(gname, nrow)
+                    tmpdf["SNP_pos"] = grp["positions"][combinedth].astype(np.int64)
                     # pvals = raw_pvalues[combinedth].tolist()
-                    tmpdf["pvalues"] = raw_pvalues[combinedth]
-                    tmpdf["macs"] = grp["macs"][combinedth].astype(np.int32)
+                    tmpdf["GWAS_pvalue"] = raw_pvalues[combinedth]
+                    tmpdf["MAC"] = grp["macs"][combinedth].astype(np.int32)
 
                     if file_df is not None:
                         file_df = pd.concat([file_df, tmpdf], ignore_index=True, axis=0)
@@ -84,10 +84,10 @@ class GwasData(object):
             bonferroni_th = fdr_alpha / len(all_pvalues)
             bh_rejected, bh_corrected = fdrcorrection0(all_pvalues, fdr_alpha, method="indep")
             bh_th = get_bh_thres(all_pvalues, fdr_alpha)
-            file_df["bonf_thres"] = np.repeat(bonferroni_th, file_df.shape[0])
-            file_df["bh_thres"] = np.repeat(bh_th["thes_pval"], file_df.shape[0])
-            file_df["bh_corrected"] = np.array(bh_corrected)[all_selected]
-            file_df["bh_rejected"] = np.array(bh_rejected)[all_selected]
+            file_df["Bonferroni_{:.3f}_threshold".format(fdr_alpha)] = np.repeat(bonferroni_th, file_df.shape[0])
+            file_df["BH_{:.3f}_threshold".format(fdr_alpha)] = np.repeat(bh_th["thes_pval"], file_df.shape[0])
+            file_df["BH_FDR_{:.3f}_adjusted".format(fdr_alpha)] = np.array(bh_corrected)[all_selected]
+            file_df["BH_FDR_{:.3f}_rejected".format(fdr_alpha)] = np.array(bh_rejected)[all_selected]
             sys.stdout.write("[ {:f}s ]\n\n".format(time.time() - start))
             if self._data is not None:
                 pd.concat([self._data, file_df], ignore_index=True, axis=0)

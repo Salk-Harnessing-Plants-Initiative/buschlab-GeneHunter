@@ -216,6 +216,7 @@ class GeneAnnotationDbExtractor:
         eloc = int(eloc)  # conversion from numpy.int because database uses native type atm
         udist = int(udist)
         ddist = int(ddist)
+        echr = echr.lower()
         # try:
         #     int(echr)
         #     chr_int_search = True

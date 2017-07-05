@@ -152,8 +152,8 @@ class GeneAnnotator(object):
 
             # genes_df = none
             for ix, row in gwd.data.iterrows():
-                gw_chr = str(row["chromosomes"]).strip()
-                gw_pos = row["positions"]
+                gw_chr = str(row["Chromosome"]).strip()
+                gw_pos = row["SNP_pos"]
                 genes = dbextract.extract_loc_uddist(gw_chr, gw_pos, args.udistance, args.ddistance)
                 sys.stdout.write("    peak: {}, pos {} -> {} genes in range\n".format(gw_chr, gw_pos, len(genes)))
                 if len(genes) == 0:
@@ -162,7 +162,7 @@ class GeneAnnotator(object):
                     ext_row["Gene_end"] = "NA"
                     ext_row["Gene_orientation"] = "NA"
                     ext_row["Relative_distance"] = "NA"
-                    ext_row["relpos"] = "NA"
+                    ext_row["SNP_relative_position"] = "NA"
                     ext_row["Target_AGI"] = "NA"
                     ext_row["Target_element_type"] = "NA"
                     ext_row["Target_sequence_type"] = "NA"
@@ -185,17 +185,17 @@ class GeneAnnotator(object):
                         ext_row["Relative_distance"] = g.start - gw_pos
 
                     if g.start <= gw_pos <= g.end:
-                        ext_row["relpos"] = "in gene"
+                        ext_row["SNP_relative_position"] = "in gene"
                     elif gw_pos < g.start:
                         if g.strand == '+':
-                            ext_row["relpos"] = "upstream"
+                            ext_row["SNP_relative_position"] = "upstream"
                         else:
-                            ext_row["relpos"] = "downstream"
+                            ext_row["SNP_relative_position"] = "downstream"
                     else:
                         if g.strand == '+':
-                            ext_row["relpos"] = "downstream"
+                            ext_row["SNP_relative_position"] = "downstream"
                         else:
-                            ext_row["relpos"] = "upstream"
+                            ext_row["SNP_relative_position"] = "upstream"
                     ext_row["Target_AGI"] = g.id
                     ext_row["Target_element_type"] = g.feature
                     ext_row["Target_sequence_type"] = g.sequencetype
@@ -218,17 +218,17 @@ class GeneAnnotator(object):
                                 ext_row["Relative_distance"] = rna.start - gw_pos
 
                             if rna.start <= gw_pos <= rna.end:
-                                ext_row["relpos"] = "in feature"
+                                ext_row["SNP_relative_position"] = "in feature"
                             elif gw_pos < rna.start:
                                 if rna.strand == '+':
-                                    ext_row["relpos"] = "upstream"
+                                    ext_row["SNP_relative_position"] = "upstream"
                                 else:
-                                    ext_row["relpos"] = "downstream"
+                                    ext_row["SNP_relative_position"] = "downstream"
                             else:
                                 if rna.strand == '+':
-                                    ext_row["relpos"] = "downstream"
+                                    ext_row["SNP_relative_position"] = "downstream"
                                 else:
-                                    ext_row["relpos"] = "upstream"
+                                    ext_row["SNP_relative_position"] = "upstream"
                             ext_row["Target_AGI"] = rna.id
                             ext_row["Target_element_type"] = rna.feature
                             ext_row["Target_sequence_type"] = rna.sequencetype
@@ -236,13 +236,14 @@ class GeneAnnotator(object):
 
                             all_peaks_df = pd.concat([all_peaks_df, ext_row.to_frame().transpose()], axis=0, ignore_index=True)
             sys.stdout.write("\n")
-        if args.output:
-            out_path = "gene-hunter_u{:d}_d{:d}_pval{:.3e}_mac{:d}_fdr{:.3f}.csv".format(args.udistance, args.ddistance,
-                                                                                         args.pvalue_threshold,
-                                                                                         args.minor_allele_count,
-                                                                                         args.fdr)
+        if args.output is not None:
+            args.output = args.output.replace("_", "-")
+            out_path = "{}_gene-hunter_u{:d}_d{:d}_pval{:.3e}_mac{:d}_fdr{:.3f}.txt".format(args.output, args.udistance, args.ddistance,
+                                                                                            args.pvalue_threshold,
+                                                                                            args.minor_allele_count,
+                                                                                            args.fdr)
             out_path = os.path.join(args.dir, out_path)
-            all_peaks_df.to_csv(out_path, sep=',', header=True, index=False)
+            all_peaks_df.to_csv(out_path, sep='\t', header=True, index=False)
         else:
             all_peaks_df.to_string(sys.stdout, header=True, index=False)
 
@@ -523,7 +524,7 @@ class GeneAnnotator(object):
                                   # \"bh\" or \"bhy\", only values below the calculated threshold are included.')
         hunterparser.add_argument('-M', '--minor_allele_count', type=int, default=10,
                                   help='minor allele count threshold (default=10)')
-        hunterparser.add_argument('-o', '--output', action="store_true", help='Output to file. Will print to stdout if omitted.')
+        hunterparser.add_argument('-o', '--output', default=None, help='Prefix for output file. Will print to stdout if omitted.')
         hunterparser.add_argument('-f', '--fdr', type=float, default=0.05,
                                   help="alpha for fdr threshold calculation")
         hunterparser.set_defaults(func=self.extract_hunter)

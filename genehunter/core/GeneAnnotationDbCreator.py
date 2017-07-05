@@ -45,18 +45,19 @@ class GeneAnnotationDbCreator(object):
                 #     tprev = tcur
 
                 cols = line.split('\t')
-                if len(cols) < 9:
+                if len(cols) < 9 or 'chromosome' in cols[2].lower():
                     line = gff_file.readline()
                     continue
+
                 attrs = self._extract_attributes(cols[8])
-                if cols[2] == 'chromosome':
-                    line = gff_file.readline()
-                    continue # ignore 'chromosome' entries found in TAIR10
+                # if cols[2] == 'chromosome':
+                #     line = gff_file.readline()
+                #     continue # ignore 'chromosome' entries found in TAIR10
                 if cols[2].lower() == 'gene' or cols[2].lower() == 'transposable_element':
                     gene_start = int(cols[3])
                     gene_end = int(cols[4])
                     # short_annotation=self._extract_short_annotation(cols[8])
-                    gene = Gene(seqname=cols[0], source=cols[1], feature=cols[2], start=gene_start,
+                    gene = Gene(seqname=cols[0].lower(), source=cols[1], feature=cols[2].lower(), start=gene_start,
                                 end=gene_end, score=cols[5], strand=cols[6], frame=cols[7],
                                 attribute=attrs.get('additional'), id=attrs.get('id'), sequencetype=attrs.get('sequencetype'))
                     self.session.add(gene)
@@ -66,12 +67,14 @@ class GeneAnnotationDbCreator(object):
                         sys.stdout.write("\r{:3.0f} % finished".format(percent_done))
                         sys.stdout.flush()
 
+                    # read sub features
                     line = gff_file.readline()
                     while line is not None and line != '':
                         line = line.strip()
 
                         cols = line.split('\t')
-                        if len(cols) < 9:
+                        if len(cols) < 9 or 'chromosome' in cols[2].lower():
+                            line = gff_file.readline()
                             continue
                         feature_start = int(cols[3])
                         feature_end = int(cols[4])
@@ -85,19 +88,21 @@ class GeneAnnotationDbCreator(object):
                         # except KeyError:
                         #     short_annotation = None  # annotation was not found in attributes
 
-                        if 'chromosome' in cols[2].lower():
-                            continue
+                        # if 'chromosome' in cols[2].lower():
+                        #     line = gff_file.readline()
+                        #     continue
                         if cols[2].lower() == 'gene' or cols[2].lower() == 'transposable_element':
-                            break
+                            break #return from sub features
+
                         if 'rna' in cols[2].lower():
-                            rna = RNA(seqname=cols[0], source=cols[1], feature=cols[2], start=feature_start,
+                            rna = RNA(seqname=cols[0].lower(), source=cols[1], feature=cols[2].lower(), start=feature_start,
                                       end=feature_end, score=cols[5], strand=cols[6], frame=cols[7],
                                       attribute=attrs.get('additional'), id=attrs.get('id'), short_annotation=attrs.get('annotation'),
                                       sequencetype=attrs.get('sequencetype'))
                             gene.rna.append(rna)
                             gene.strand = cols[6]
                         else:
-                            feature = Feature(seqname=cols[0], source=cols[1], feature=cols[2],
+                            feature = Feature(seqname=cols[0].lower(), source=cols[1], feature=cols[2].lower(),
                                               start=int(cols[3]),
                                               end=int(cols[4]), score=cols[5], strand=cols[6],
                                               frame=cols[7],
