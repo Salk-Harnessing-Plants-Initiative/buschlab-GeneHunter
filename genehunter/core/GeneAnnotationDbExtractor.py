@@ -2,15 +2,14 @@
 
 """genehunter.tairdb_extractor: module for querying the database."""
 
-import os
 import sys
-import re
 import unicodedata
-import pandas as pd
-import numpy as np
+
+import os
+import re
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import select
+
 # from sqlalchemy.orm.exc import *
 # from sqlalchemy import and_, or_
 from genehunter.core.HunterData import OutputData

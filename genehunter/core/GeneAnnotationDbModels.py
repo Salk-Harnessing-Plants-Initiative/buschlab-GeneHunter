@@ -2,10 +2,9 @@
 
 """genehunter.tairdb_models: module defining the classes which are mapped to the database by sqlalchemy."""
 
-from sqlalchemy import Column, Integer, Float, String, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.sql.sqltypes import UnicodeText
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 

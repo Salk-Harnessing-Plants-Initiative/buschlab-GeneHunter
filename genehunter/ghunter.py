@@ -15,7 +15,7 @@ from genehunter.core.GeneAnnotationDbCreator import GeneAnnotationDbCreator
 from genehunter.core.GeneAnnotationDbExtractor import GeneAnnotationDbExtractor
 from genehunter.core.HunterData import InputData, GwasData
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 
 def main():
@@ -141,13 +141,15 @@ class GeneAnnotator(object):
     @staticmethod
     def extract_hunter(args):
         dbextract = GeneAnnotationDbExtractor(args.db)
-        sys.stdout.write("gene hunter using database: {}".format(args.db))
+        sys.stdout.write("gene hunter using database: {}\n".format(args.db))
 
         all_peaks_df = None
         for gwasfilename in glob.glob(os.path.join(args.dir, args.name)):
             assert gwasfilename.endswith(".hdf5") #TODO: create stable test
             gwd = GwasData()
             gwd.read_hdf5(gwasfilename, pval_threshold=args.pvalue_threshold, mac_threshold=args.minor_allele_count, fdr_alpha=args.fdr)
+            if gwd.data is None:
+                continue
             # peaks_df = gwd.data
 
             # genes_df = none
@@ -166,6 +168,7 @@ class GeneAnnotator(object):
                     ext_row["Target_AGI"] = "NA"
                     ext_row["Target_element_type"] = "NA"
                     ext_row["Target_sequence_type"] = "NA"
+                    ext_row["Target_annotation"] = "NA"
                     ext_row["Target_attributes"] = "NA"
 
                     if all_peaks_df is not None:
@@ -199,6 +202,7 @@ class GeneAnnotator(object):
                     ext_row["Target_AGI"] = g.id
                     ext_row["Target_element_type"] = g.feature
                     ext_row["Target_sequence_type"] = g.sequencetype
+                    ext_row["Target_annotation"] = "NA"
                     ext_row["Target_attributes"] = g.attribute
 
                     if all_peaks_df is not None:
@@ -232,6 +236,10 @@ class GeneAnnotator(object):
                             ext_row["Target_AGI"] = rna.id
                             ext_row["Target_element_type"] = rna.feature
                             ext_row["Target_sequence_type"] = rna.sequencetype
+                            if rna.short_annotation is not None:
+                                ext_row["Target_annotation"] = rna.short_annotation
+                            else:
+                                ext_row["Target_annotation"] = "NA"
                             ext_row["Target_attributes"] = rna.attribute
 
                             all_peaks_df = pd.concat([all_peaks_df, ext_row.to_frame().transpose()], axis=0, ignore_index=True)
@@ -464,7 +472,7 @@ class GeneAnnotator(object):
     @staticmethod
     def remap_hdf5_results(args):
         for h5filepath in glob.glob(os.path.join(args.dir, args.name)):
-            GwasData.remap_hdf5_results(h5filepath, args.mapfile)
+            GwasData.remap_hdf5_results(h5filepath, args.snpsfile, args.nobak)
 
     def parse_arguments(self):
         mainparser = argparse.ArgumentParser(description='tair database suite',
@@ -532,7 +540,8 @@ class GeneAnnotator(object):
         remapparser = subparsers.add_parser('remap_chrs', help='remap integer chromosome names to real names')
         remapparser.add_argument('-d', '--dir', required=True, help='directory where to look for pval files')
         remapparser.add_argument('-n', '--name', default="*.hdf5", required=True, help='hdf5 file(s) to be changed')
-        remapparser.add_argument('-m', '--mapfile', required=True, help='comma separated txt file containing the mapping')
+        remapparser.add_argument('-s', '--snpsfile', required=True, help='snps file containing the mapping information')
+        remapparser.add_argument('--nobak', action="store_true", help='do not create backup files')
         remapparser.set_defaults(func=self.remap_hdf5_results)
 
         statusparser = subparsers.add_parser('stats', help='get some statistics about database')

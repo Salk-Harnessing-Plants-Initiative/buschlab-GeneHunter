@@ -2,13 +2,11 @@
 
 """genehunter.tairdb_creator: module for database creation."""
 
-import os
 import sys
+import os
 import re
-import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 
 from .GeneAnnotationDbModels import Base, Gene, RNA, Feature  # , Description
 

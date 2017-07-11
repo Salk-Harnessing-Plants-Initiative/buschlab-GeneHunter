@@ -61,7 +61,7 @@ class GwasData(object):
                     #     "macs": grp["macs"][combinedth]
                     # })
                     tmpdf = pd.DataFrame(columns=["Original_file", "Chromosome", "SNP_pos", "GWAS_pvalue", "MAC"])
-                                         #dtype={'origin': np.str, "chromosomes": np.int32, "positions": np.int64, "pvalues": np.float64, "macs": np.int32})
+                    # dtype={'origin': np.str, "chromosomes": np.int32, "positions": np.int64, "pvalues": np.float64, "macs": np.int32})
                     tmpdf["Original_file"] = np.repeat(os.path.basename(filepath), nrow).astype(np.str)
                     # tmpdf["chromosomes"] = np.repeat(int(gname.strip("chr")), nrow).astype(np.int32)
                     tmpdf["Chromosome"] = np.repeat(gname, nrow)
@@ -76,7 +76,8 @@ class GwasData(object):
                         file_df = tmpdf
         sys.stdout.write("[ {:f}s ]\n".format(time.time() - start))
 
-        if file_df.shape[0] > 0:
+        if file_df is not None and file_df.shape[0] > 0:
+            all_selected = np.array(all_selected)
             sys.stdout.write("{:d} positions passed.\n".format(file_df.shape[0]))
             sys.stdout.write("calculating thresholds ... ")
             sys.stdout.flush()
@@ -96,37 +97,45 @@ class GwasData(object):
         else:
             sys.stdout.write("no positions passed.")
 
-
     @staticmethod
-    def remap_hdf5_results(h5filepath, mapfilepath):
-        chrom_mapping = dict()
-        with open(mapfilepath, "r") as mapfile:
-            for line in mapfile:
-                cols = line.split(',')
-                try:
-                    chrom_mapping[int(cols[0])] = cols[1].strip()
-                except ValueError:
-                    continue
-
-        with h5.File(h5filepath, "a") as h5file:
-            pval_grp = h5file["pvalues"]
-
-            backup_filepath = h5filepath + ".bak"
-            if not os.path.exists(backup_filepath):
-                shutil.copy2(h5filepath, backup_filepath)
-            else:
-                sys.stdout.write("Backup copy for file: {} exists. Skipping this file.\n".format(h5filepath))
+    def remap_hdf5_results(h5_results_path, h5_snps_path, create_backup):
+        with h5.File(h5_snps_path, "r") as h5snps:
+            if b"chr_names" not in h5snps["positions"].attrs.keys():
+                sys.stdout.write("'{}' does not contain alternative chromosome names. No chromosomes remapping done.".format(h5_snps_path))
                 return
+
+            chr_names = h5snps["positions"].attrs["chr_names"]
+            chrs = h5snps["positions"].attrs["chrs"]
+
+        # chrom_mapping = dict()
+        # with open(mapfilepath, "r") as mapfile:
+        #     for line in mapfile:
+        #         cols = line.split(',')
+        #         try:
+        #             chrom_mapping[int(cols[0])] = cols[1].strip()
+        #         except ValueError:
+        #             continue
+
+        with h5.File(h5_results_path, "a") as h5results:
+            pval_grp = h5results["pvalues"]
+
+            if not create_backup:
+                backup_filepath = h5_results_path + ".bak"
+                if not os.path.exists(backup_filepath):
+                    shutil.copy2(h5_results_path, backup_filepath)
+                else:
+                    sys.stdout.write("Backup copy for file: {} exists. Skipping this file.\n".format(h5_results_path))
+                    return
 
             current_keys = pval_grp.keys()
-            if len(set(chrom_mapping.values()) & set(current_keys)) == len(current_keys):
-                sys.stdout.write("Chromosomes seem to be already remapped in file: {}. Skipping this file.\n".format(h5filepath))
+            if len(set(chr_names) & set(current_keys)) == len(current_keys):
+                sys.stdout.write("Chromosomes seem to be already remapped in file: {}. Skipping this file.\n".format(
+                    h5_results_path))
                 return
 
-            sys.stdout.write("Remapping chromosomes in file: {}.\n".format(h5filepath))
+            sys.stdout.write("Remapping chromosomes in file: {}.\n".format(h5_results_path))
             for key in pval_grp.keys():
-                intkey = int(key.strip('chr'))
-                real_name = chrom_mapping[intkey]
+                real_name = chr_names[np.where(chrs == int(key.strip('chr')))][0]
                 pval_grp.move(key, real_name)
 
 
@@ -134,12 +143,12 @@ class InputData(object):
     def __init__(self, fdr=0.05):
         self.fdr = fdr
         self.df = pd.DataFrame(columns=["Original_file", "Chromosome", "SNP_pos", "GWAS_p-value", "uDist", "dDist"])
-                                               #FDR_{}_rejected".format(fdr), "FDR_{}_adjusted_p-value".format(fdr),
-                                               #"Bonferroni_{}_threshold".format(fdr), "BH_{}_threshold".format(fdr),
-                                               #"BHY_{}_threshold".format(fdr), "Gene_start", "Gene_end",
-                                               #"Gene_orientation", "Relative_Distance", "SNP_relative_position",
-                                               #"target_AGI", "target_element_type", "target_sequence_type",
-                                               #"target_annotation", "target_attributes"])
+        # FDR_{}_rejected".format(fdr), "FDR_{}_adjusted_p-value".format(fdr),
+        # "Bonferroni_{}_threshold".format(fdr), "BH_{}_threshold".format(fdr),
+        # "BHY_{}_threshold".format(fdr), "Gene_start", "Gene_end",
+        # "Gene_orientation", "Relative_Distance", "SNP_relative_position",
+        # "target_AGI", "target_element_type", "target_sequence_type",
+        # "target_annotation", "target_attributes"])
         self.cols = self.df.columns
 
     def add_dataset(self, data):
@@ -171,7 +180,7 @@ class OutputData(object):
             ("target_sequence_type", "str"),
             ("target_annotation", "str"),
             ("target_attributes", "str")
-            ])
+        ])
         self.df = pd.DataFrame({k: pd.Series(dtype=v) for k, v in self.col_types.items()})
 
     def add_dataset(self, dataseries):
@@ -184,5 +193,9 @@ class OutputData(object):
 
 if __name__ == '__main__':
     gwd = GwasData()
-    gwd.read_hdf5("/net/gmi.oeaw.ac.at/busch/lab/Marco/GWAS/Medicago/20170606_Mt_StantonGeddes2013_gwas-results/20170606_Mt_StantonGeddes2013_height3.hdf5", pval_threshold=1.0e-6, mac_threshold=10)
-    gwd.read_hdf5("/net/gmi.oeaw.ac.at/busch/lab/Marco/GWAS/Medicago/20170606_Mt_StantonGeddes2013_gwas-results/20170606_Mt_StantonGeddes2013_totNod.hdf5", pval_threshold=1.0e-6, mac_threshold=10)
+    gwd.read_hdf5(
+        "/net/gmi.oeaw.ac.at/busch/lab/Marco/GWAS/Medicago/20170606_Mt_StantonGeddes2013_gwas-results/20170606_Mt_StantonGeddes2013_height3.hdf5",
+        pval_threshold=1.0e-6, mac_threshold=10)
+    gwd.read_hdf5(
+        "/net/gmi.oeaw.ac.at/busch/lab/Marco/GWAS/Medicago/20170606_Mt_StantonGeddes2013_gwas-results/20170606_Mt_StantonGeddes2013_totNod.hdf5",
+        pval_threshold=1.0e-6, mac_threshold=10)
