@@ -244,16 +244,17 @@ class GeneAnnotator(object):
 
                             all_peaks_df = pd.concat([all_peaks_df, ext_row.to_frame().transpose()], axis=0, ignore_index=True)
             sys.stdout.write("\n")
-        if args.output is not None:
-            args.output = args.output.replace("_", "-")
-            out_path = "{}_gene-hunter_u{:d}_d{:d}_pval{:.3e}_mac{:d}_fdr{:.3f}.txt".format(args.output, args.udistance, args.ddistance,
-                                                                                            args.pvalue_threshold,
-                                                                                            args.minor_allele_count,
-                                                                                            args.fdr)
-            out_path = os.path.join(args.dir, out_path)
-            all_peaks_df.to_csv(out_path, sep='\t', header=True, index=False)
-        else:
-            all_peaks_df.to_string(sys.stdout, header=True, index=False)
+        if all_peaks_df is not None:
+            if args.output is not None:
+                args.output = args.output.replace("_", "-")
+                out_path = "{}_gene-hunter_u{:d}_d{:d}_pval{:.3e}_mac{:d}_fdr{:.3f}.txt".format(args.output, args.udistance, args.ddistance,
+                                                                                                args.pvalue_threshold,
+                                                                                                args.minor_allele_count,
+                                                                                                args.fdr)
+                out_path = os.path.join(args.dir, out_path)
+                all_peaks_df.to_csv(out_path, sep='\t', header=True, index=False)
+            else:
+                all_peaks_df.to_string(sys.stdout, header=True, index=False)
 
     @staticmethod
     def extract_hunter_deprecated(args):
